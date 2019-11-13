@@ -86,10 +86,10 @@ df[["premium_motor","premium_household","premium_health","premium_life","premium
 
 educ_grouped = df[["educ","birth_year", "salary_year"]].groupby(["educ","birth_year"]).mean()
 
-#from sklearn import preprocessing
-#le_status = preprocessing.LabelEncoder()
-#df['educ_encoded'] = le_status.fit_transform(df["educ"])
-#le_status.classes_
+from sklearn import preprocessing
+le_status = preprocessing.LabelEncoder()
+df['loc_encoded'] = le_status.fit_transform(df["location"])
+le_status.classes_
 
 from sklearn.preprocessing import OneHotEncoder
 #define encoder
@@ -98,7 +98,7 @@ status_ohe = OneHotEncoder()
 #apply encoder
 
 
-Status = status_ohe.fit_transform(df.location.values.reshape(-1,1)).toarray()
+Status = status_ohe.fit_transform(df.loc_encoded.values.reshape(-1,1)).toarray()
 
 my_data_to_label_OneHot_s = pd.DataFrame(Status, columns = ["location_"+str(i) for i in range(4)] )
 
@@ -108,7 +108,7 @@ new_data = df.join(my_data_to_label_OneHot_s, on=df.index)
 df_incomplete = df[df["educ"]==df["educ"]]
 
 Status_2 = status_ohe.fit_transform(df_incomplete.educ.values.reshape(-1,1)).toarray()
-
+s
 my_data_to_label_OneHot_s_2 = pd.DataFrame(Status_2, columns = ["educ_"+str(i) for i in range(4)] )
 
 new_data = new_data.join(my_data_to_label_OneHot_s_2, on=d)
