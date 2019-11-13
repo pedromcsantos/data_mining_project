@@ -1,5 +1,7 @@
 import pandas as pd
-#michael is very stupid
+
 df = pd.read_csv("A2Z Insurance.csv")
 
-x = 1
+df.isnull().sum()
+
+df =df[df["Brithday Year"]>1900] #Drop one case where birthday year <1900 
