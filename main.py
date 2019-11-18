@@ -3,12 +3,18 @@ import matplotlib.pyplot as plt
 import seaborn as sb
 import numpy as np
 from itertools import chain
+from sklearn.neighbors import NearestNeighbors
+from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import OneHotEncoder
+from kmodes.kprototypes import KPrototypes
 
 df = pd.read_csv("A2Z Insurance.csv")
 df = df.set_index("Customer Identity")
 newnames = ["first_policy","birth_year","educ","salary_monthly","location","has_children","mon_value","claims_rate","premium_motor","premium_household","premium_health","premium_life","premium_work_comp"]
 df.rename(columns=dict(zip(df.columns.values, newnames)), inplace = True)
 
+
+#####################################################################################
 describe = df.describe()
 
 # Detect potential outlier and drop rows with obvious mistakes
@@ -55,9 +61,6 @@ work_outlier = df[df["premium_work_comp"]>1750]
 #plt.scatter(x= df.index, y=df["premium_life"]) 
 #plt.show() #looks ok
 
-
-outliers = list(chain(salary_outlier.index.values,mon_value_outlier.index.values,claims_rate_outlier.index.values,motor_outlier.index.values,household_outlier.index.values,health_outlier.index.values,work_outlier.index.values))
-
 #Check for every customer if the first policy was made before he was born
 check_policy = df[df["first_policy"]<df["birth_year"]] #~2000 values, we treat the wrong dates as nan values
 def birth_helpfunc(x):
@@ -66,12 +69,33 @@ def birth_helpfunc(x):
     return x
 df = df.apply(lambda x: birth_helpfunc(x), axis=1)
 
+#####################################################################################
+################# Outlier #################
+df.reset_index(inplace=True,drop=True)
+df_num = pd.DataFrame(df[['first_policy','birth_year', 'salary_year','mon_value','claims_rate','premium_motor','premium_household','premium_health','premium_life','premium_work_comp']])
 
-#filling NAN
-from sklearn.neighbors import NearestNeighbors
-from sklearn.preprocessing import StandardScaler
-from sklearn.preprocessing import OneHotEncoder
-from kmodes.kprototypes import KPrototypes
+def calc_threshold(column_name, multiplier):
+	Q1 = df_num[column_name].quantile(0.25)
+	Q3 = df_num[column_name].quantile(0.75)
+	IQR = Q3 - Q1
+	return IQR * multiplier
+
+#multi = 1.5
+#multi = 3
+multi = 4.5
+
+outliers = []
+for col in df_num.columns.values[1:]:
+	th_pos = calc_threshold(col, multi) + df_num[col].mean()
+	th_neg = df_num[col].mean() - calc_threshold(col, multi)
+	outliers.append(df_num[(df_num[col] >= th_pos) | (df_num[col] <= th_neg)].index.values)
+
+df_outlier = df_num.iloc[list(set([o for l in outliers for o in l]))]
+
+df = df[~df.index.isin(df_outlier.index.values)]
+
+#####################################################################################
+################# filling NAN #################
 
 dfisnull = df.isnull().sum()
 
@@ -79,8 +103,8 @@ dfisnull = df.isnull().sum()
 #Assumption: nan values in premium mean no contract 
 df[["premium_motor","premium_household","premium_health","premium_life","premium_work_comp"]] = df[["premium_motor","premium_household","premium_health","premium_life","premium_work_comp"]].fillna(0)
 
-##############################################################
-### Option 1 ###
+
+###### Option 1 ######
 
 # Filling nan values in educ, salary, has_children and birth_year (the wrong one) with k-prototype
 # For this step we remove all rows with nan-values and outliers from the dataframe
@@ -122,45 +146,68 @@ for i in isnan_check.columns.values:
 			df_filled.loc[j,i] = cluster_centroids.loc[df_filled.loc[j, "cluster"], i]
 
 ##############################################################
-### Option 2 ###
+###### Option 2 ######
 # Fill nan-value individually by column
 # Use correlation matrix
 corrmap = df.corr()
+
+# Drop customers with nan values in "salary_year","educ" or "has_children" because these are only a few customers and we do not have any reasonable correlation to fill it 
+df = df.dropna(subset=["salary_year","educ","has_children"])
 
 # birth_year
 # correlation with salary is quite high
 # Fill values with mean of customers with same salary +/-1000, drop customers if salaray is nan
 def get_birthyear(salary):
-	 return round(df.loc[(df["salary_year"] >= salary - 1000) & (df["salary_year"] < salary + 1000), "birth_year"].mean())
- 
+	 return round(df.loc[df["birth_year"].notnull() & (df["salary_year"] <= salary + 1000) & (df["salary_year"] <= salary + 1000)].mean())
+
 df.loc[df["birth_year"].isnull(),"birth_year"] = df.loc[df["birth_year"].isnull(),"salary_year"].apply(lambda s: get_birthyear(s))
-df = df.dropna(subset=["birth_year"])
 
-# has_children
-# correlation with birth_year is quite high. 
-# Fill values with mean of birth_years
-def get_has_children(birth_year):
-	zero = df[["has_children", "birth_year"]].groupby("has_children").mean().values[0][0]
-	one = df[["has_children", "birth_year"]].groupby("has_children").mean().values[1][0]
+##############################################################
 
-	if (abs(birth_year - zero)) <= (abs(birth_year - one)):  
-		return 0
-	else: 
-		return 1
+
+################# Feature selection #################
+
+# Split the features in customer- and product-related. 
+customer_related = ['first_policy', 'birth_year', 'educ', 'salary_year', 'location','has_children', 'mon_value', 'claims_rate']
+product_related = ['premium_motor','premium_household', 'premium_health', 'premium_life','premium_work_comp']
+
+
+################# Similarity measures #################
+
+# euclidean or cosine
+
+
+
+
+
+################# Choose algorithm #################
+##### Customer-related #####
+### K-Prototype ###
+
+# Normalization
+scaler = StandardScaler()
+num_norm = scaler.fit_transform(df_fill[['first_policy','birth_year', 'salary_year','mon_value','claims_rate','premium_motor','premium_household','premium_health','premium_life','premium_work_comp']])
+df_num_norm = pd.DataFrame(num_norm, columns = ['first_policy','birth_year', 'salary_year','mon_value','claims_rate','premium_motor','premium_household','premium_health','premium_life','premium_work_comp'])
+df_fill_norm = df_num_norm.join(df_fill[["educ", "location","has_children"]])
+
+# Find number of clusters
+# Elbow graph
+C = []
+
+for i in range(1,20):
+	kproto = KPrototypes(n_clusters=i, init='random', random_state=1).fit(df_fill_norm, categorical=[10,11,12])
+	C.append(kproto.cost_)
+
+plt.plot(range(1,20), C)	
 	
-df.loc[df["has_children"].isnull(), "has_children"] = df.loc[df["has_children"].isnull(), "birth_year"].apply(lambda b: get_has_children(b))
-
-# education 
 
 
 
 
-
-
-
-
-
-
+# Inverse Normalization for Interpretation
+cluster_centroids_num = pd.DataFrame(scaler.inverse_transform(X = kproto.cluster_centroids_[0]), columns = df_num_norm.columns)
+cluster_centroids = pd.concat([cluster_centroids_num,pd.DataFrame(kproto.cluster_centroids_[1])], axis=1)
+cluster_centroids.columns = df_fill_norm.columns
 
 
 
