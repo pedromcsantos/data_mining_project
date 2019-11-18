@@ -7,6 +7,7 @@ from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import StandardScaler
 from sklearn.preprocessing import OneHotEncoder
 from kmodes.kprototypes import KPrototypes
+from sklearn.cluster import KMeans
 
 df = pd.read_csv("A2Z Insurance.csv")
 df = df.set_index("Customer Identity")
@@ -108,8 +109,8 @@ df[["premium_motor","premium_household","premium_health","premium_life","premium
 
 # Filling nan values in educ, salary, has_children and birth_year (the wrong one) with k-prototype
 # For this step we remove all rows with nan-values and outliers from the dataframe
-df_fill = df.drop(outliers)
-df_fill = df_fill.dropna()
+#df_fill = df.drop(df_outlier) not necessary
+df_fill = df.dropna()
 df_fill = df_fill.reset_index(drop=True)
 # Normalization
 scaler = StandardScaler()
@@ -184,37 +185,44 @@ product_related = ['premium_motor','premium_household', 'premium_health', 'premi
 ##### Customer-related #####
 ### K-Prototype ###
 
-# Normalization
+# Normalization for Product
 scaler = StandardScaler()
-num_norm = scaler.fit_transform(df_fill[['first_policy','birth_year', 'salary_year','mon_value','claims_rate','premium_motor','premium_household','premium_health','premium_life','premium_work_comp']])
-df_num_norm = pd.DataFrame(num_norm, columns = ['first_policy','birth_year', 'salary_year','mon_value','claims_rate','premium_motor','premium_household','premium_health','premium_life','premium_work_comp'])
-df_fill_norm = df_num_norm.join(df_fill[["educ", "location","has_children"]])
+num_norm = scaler.fit_transform(df_fill[['premium_motor','premium_household','premium_health','premium_life','premium_work_comp']])
+df_num_norm = pd.DataFrame(num_norm, columns = ['premium_motor','premium_household','premium_health','premium_life','premium_work_comp'])
 
+"""
 # Find number of clusters
 # Elbow graph
 C = []
 
 for i in range(1,20):
-	kproto = KPrototypes(n_clusters=i, init='random', random_state=1).fit(df_fill_norm, categorical=[10,11,12])
-	C.append(kproto.cost_)
+    kproto = KPrototypes(n_clusters=i, init='random', random_state=1).fit(df_fill_norm, categorical=[10,11,12])
+    C.append(kproto.cost_)
+    print(i)
+
 
 plt.plot(range(1,20), C)	
-	
-
+	"""
+kmeans = KMeans(n_clusters=5, random_state=1).fit(df_num_norm)
 
 
 
 # Inverse Normalization for Interpretation
-cluster_centroids_num = pd.DataFrame(scaler.inverse_transform(X = kproto.cluster_centroids_[0]), columns = df_num_norm.columns)
-cluster_centroids = pd.concat([cluster_centroids_num,pd.DataFrame(kproto.cluster_centroids_[1])], axis=1)
+cluster_centroids_num = pd.DataFrame(scaler.inverse_transform(X=kmeans.cluster_centers_), columns = df_num_norm.columns)
+
+
+# Normalization for Customer
+scaler = StandardScaler()
+num_norm = scaler.fit_transform(df_fill[['first_policy', 'birth_year', 'salary_year', 'mon_value', 'claims_rate']])
+df_num_norm = pd.DataFrame(num_norm, columns = ['first_policy', 'birth_year', 'salary_year', 'mon_value', 'claims_rate'])
+df_fill_norm =df_num_norm.join(df_fill[["educ","location","has_children"]])
+
+kproto = KPrototypes(n_clusters=5, init='random', random_state=1).fit(df_fill_norm, categorical=[5,6,7])
+
+# Inverse Normalization for Interpretation
+cluster_centroids_num = pd.DataFrame(scaler.inverse_transform(X = kmeans.cluster_centers_[0]), columns = df_fill_norm.columns)
+cluster_centroids = pd.concat([cluster_centroids_num,pd.DataFrame(kmeans.cluster_centers_[1])], axis=1)
 cluster_centroids.columns = df_fill_norm.columns
-
-
-
-
-
-
-
 
 
 
