@@ -220,8 +220,8 @@ df_fill_norm =df_num_norm.join(df_fill[["educ","location","has_children"]])
 kproto = KPrototypes(n_clusters=5, init='random', random_state=1).fit(df_fill_norm, categorical=[5,6,7])
 
 # Inverse Normalization for Interpretation
-cluster_centroids_num = pd.DataFrame(scaler.inverse_transform(X = kmeans.cluster_centers_[0]), columns = df_fill_norm.columns)
-cluster_centroids = pd.concat([cluster_centroids_num,pd.DataFrame(kmeans.cluster_centers_[1])], axis=1)
+cluster_centroids_num = pd.DataFrame(scaler.inverse_transform(X = kproto.cluster_centroids_[0]), columns = df_num_norm.columns)
+cluster_centroids = pd.concat([cluster_centroids_num,pd.DataFrame(kproto.cluster_centroids_[1])], axis=1)
 cluster_centroids.columns = df_fill_norm.columns
 
 
