@@ -79,42 +79,78 @@ dfisnull = df.isnull().sum()
 #Assumption: nan values in premium mean no contract 
 df[["premium_motor","premium_household","premium_health","premium_life","premium_work_comp"]] = df[["premium_motor","premium_household","premium_health","premium_life","premium_work_comp"]].fillna(0)
 
+##############################################################
+### Option 1 ###
+
 # Filling nan values in educ, salary, has_children and birth_year (the wrong one) with k-prototype
 # For this step we remove all rows with nan-values and outliers from the dataframe
-
 df_fill = df.drop(outliers)
 df_fill = df_fill.dropna()
 df_fill = df_fill.reset_index(drop=True)
-
 # Normalization
 scaler = StandardScaler()
 num_norm = scaler.fit_transform(df_fill[['first_policy','birth_year', 'salary_year','mon_value','claims_rate','premium_motor','premium_household','premium_health','premium_life','premium_work_comp']])
 df_num_norm = pd.DataFrame(num_norm, columns = ['first_policy','birth_year', 'salary_year','mon_value','claims_rate','premium_motor','premium_household','premium_health','premium_life','premium_work_comp'])
 df_fill_norm = df_num_norm.join(df_fill[["educ", "location","has_children"]])
 
-kproto = KPrototypes(n_clusters=9, init='random', n_init=1)
+# Fit model 
+kproto = KPrototypes(n_clusters=9, init='random', random_state=1, n_init=1)
 observ_cluster = kproto.fit_predict(df_fill_norm, categorical=[10,11,12])
 
-cluster_centroids = kproto.cluster_centroids_
+# Inverse Normalization for Interpretation
+cluster_centroids_num = pd.DataFrame(scaler.inverse_transform(X = kproto.cluster_centroids_[0]), columns = df_num_norm.columns)
+cluster_centroids = pd.concat([cluster_centroids_num,pd.DataFrame(kproto.cluster_centroids_[1])], axis=1)
+cluster_centroids.columns = df_fill_norm.columns
 
 # Fill missing values with mean of column, predict cluster of customer and change missing value to centroid of cluster
 df_isnan = df[df.isnull().any(axis=1)].reset_index(drop=True)
 isnan_check = df_isnan.isnull() # to check if a value was a nan-value before imputation
-# Fill missing values
+
+# Fill missing values with mean/mode
 df_isnan.loc[:,['first_policy','birth_year', 'salary_year']] = df_isnan.loc[:,['first_policy','birth_year', 'salary_year']].fillna(df_isnan[['first_policy','birth_year', 'salary_year']].mean())
 df_isnan.loc[:,["educ", "location","has_children"]] = df_isnan.loc[:,["educ", "location","has_children"]].fillna(df_isnan[["educ", "location","has_children"]].mode().iloc[0,:])
 
 
-# Normalization
-scaler = StandardScaler()
-num_norm = scaler.fit_transform(df_isnan[['first_policy','birth_year', 'salary_year','mon_value','claims_rate','premium_motor','premium_household','premium_health','premium_life','premium_work_comp']])
-df_num_norm = pd.DataFrame(num_norm, columns = ['first_policy','birth_year', 'salary_year','mon_value','claims_rate','premium_motor','premium_household','premium_health','premium_life','premium_work_comp'])
-df_isnan_norm = df_num_norm.join(df_isnan[["educ", "location","has_children"]])
-
-# Predict clusters
-df_isnan["cluster"] = kproto.predict(df_isnan_norm, categorical=[10,11,12])
+# Predict clusters of customers with missing values
+df_isnan["cluster"] = kproto.predict(df_isnan, categorical=[0,1,2])
 
 # Change nan-values to centroids of cluster
+df_filled = df_isnan.copy()
+for i in isnan_check.columns.values: 
+	for j in isnan_check.index.values:
+		if isnan_check.loc[j,i]:
+			df_filled.loc[j,i] = cluster_centroids.loc[df_filled.loc[j, "cluster"], i]
+
+##############################################################
+### Option 2 ###
+# Fill nan-value individually by column
+# Use correlation matrix
+corrmap = df.corr()
+
+# birth_year
+# correlation with salary is quite high
+# Fill values with mean of customers with same salary +/-1000, drop customers if salaray is nan
+def get_birthyear(salary):
+	 return round(df.loc[(df["salary_year"] >= salary - 1000) & (df["salary_year"] < salary + 1000), "birth_year"].mean())
+ 
+df.loc[df["birth_year"].isnull(),"birth_year"] = df.loc[df["birth_year"].isnull(),"salary_year"].apply(lambda s: get_birthyear(s))
+df = df.dropna(subset=["birth_year"])
+
+# has_children
+# correlation with birth_year is quite high. 
+# Fill values with mean of birth_years
+def get_has_children(birth_year):
+	zero = df[["has_children", "birth_year"]].groupby("has_children").mean().values[0][0]
+	one = df[["has_children", "birth_year"]].groupby("has_children").mean().values[1][0]
+
+	if (abs(birth_year - zero)) <= (abs(birth_year - one)):  
+		return 0
+	else: 
+		return 1
+	
+df.loc[df["has_children"].isnull(), "has_children"] = df.loc[df["has_children"].isnull(), "birth_year"].apply(lambda b: get_has_children(b))
+
+# education 
 
 
 
