@@ -190,26 +190,66 @@ scaler = StandardScaler()
 num_norm = scaler.fit_transform(df_fill[['premium_motor','premium_household','premium_health','premium_life','premium_work_comp']])
 df_num_norm = pd.DataFrame(num_norm, columns = ['premium_motor','premium_household','premium_health','premium_life','premium_work_comp'])
 
-"""
+
 # Find number of clusters
 # Elbow graph
-C = []
+product_clusters = []
 
-for i in range(1,20):
-    kproto = KPrototypes(n_clusters=i, init='random', random_state=1).fit(df_fill_norm, categorical=[10,11,12])
-    C.append(kproto.cost_)
-    print(i)
+for i in range(1,10):
+    kmeans = KMeans(n_clusters=i, random_state=1).fit(df_num_norm)
+    product_clusters.append(kmeans.inertia_)
+    print(i) #check what iteration we are in
 
 
-plt.plot(range(1,20), C)	
-	"""
-kmeans = KMeans(n_clusters=5, random_state=1).fit(df_num_norm)
+plt.plot(range(1,10), product_clusters)	# 2 or 3 clusters
+
+
+#Silhouette
+from sklearn.metrics import silhouette_samples 
+from sklearn.metrics import silhouette_score  #avg of avgs
+n_clusters = 3
+
+silhouette_avg = silhouette_score(df_num_norm, kmeans.labels_)
+print("For n_clusters =", n_clusters,
+          "The average silhouette_score is :", silhouette_avg)
+
+# Compute the silhouette scores for each sample
+sample_silhouette_values = silhouette_samples(df_num_norm, kmeans.labels_)
+
+cluster_labels = kmeans.labels_
+
+import matplotlib.cm as cm
+y_lower = 100
+
+fig = plt.figure()
+ax1 = fig.add_subplot(111)
+
+for i in range(n_clusters):
+    ith_cluster_silhouette_values = sample_silhouette_values[cluster_labels == i]
+    ith_cluster_silhouette_values.sort()
+    size_cluster_i=ith_cluster_silhouette_values. shape[0]
+    y_upper = y_lower + size_cluster_i
+    y_upper = y_lower + size_cluster_i
+    color = cm.nipy_spectral(float(i) / n_clusters)
+    ax1.fill_betweenx(np.arange(y_lower, y_upper),
+                          0, ith_cluster_silhouette_values,
+                          facecolor=color, edgecolor=color, alpha=0.7)
+
+    # Label the silhouette plots with their cluster numbers at the middle
+    ax1.text(-0.05, y_lower + 0.5 * size_cluster_i, str(i))
+
+    # Compute the new y_lower for next plot
+    y_lower = y_upper + 10  # 10 for the 0 samples
+
+kmeans = KMeans(n_clusters=3, random_state=1).fit(df_num_norm)
 
 
 
 # Inverse Normalization for Interpretation
 cluster_centroids_num = pd.DataFrame(scaler.inverse_transform(X=kmeans.cluster_centers_), columns = df_num_norm.columns)
 
+#2 clusters : Clients that prefer motor insurance and Clients that prefer the others
+#3 clusters: Clients that prefer motor insurance and low on the others, Clients that prefer Health and moderate on the others, and Clients that are High on life, household and work and moderate on the others
 
 # Normalization for Customer
 scaler = StandardScaler()
@@ -217,13 +257,25 @@ num_norm = scaler.fit_transform(df_fill[['first_policy', 'birth_year', 'salary_y
 df_num_norm = pd.DataFrame(num_norm, columns = ['first_policy', 'birth_year', 'salary_year', 'mon_value', 'claims_rate'])
 df_fill_norm =df_num_norm.join(df_fill[["educ","location","has_children"]])
 
-kproto = KPrototypes(n_clusters=5, init='random', random_state=1).fit(df_fill_norm, categorical=[5,6,7])
+
+customer_clusters = []
+
+for i in range(1,10):
+    kproto = KPrototypes(n_clusters=i, init='random', random_state=1).fit(df_fill_norm, categorical=[5,6,7])
+    customer_clusters.append(kproto.cost_)
+    print(i) #check what iteration we are in
+
+
+plt.plot(range(1,10), customer_clusters)	
+
+kproto = KPrototypes(n_clusters=3, init='random', random_state=1).fit(df_fill_norm, categorical=[5,6,7])
 
 # Inverse Normalization for Interpretation
-cluster_centroids_num = pd.DataFrame(scaler.inverse_transform(X = kproto.cluster_centroids_[0]), columns = df_num_norm.columns)
-cluster_centroids = pd.concat([cluster_centroids_num,pd.DataFrame(kproto.cluster_centroids_[1])], axis=1)
-cluster_centroids.columns = df_fill_norm.columns
+cluster_centroids_num_c = pd.DataFrame(scaler.inverse_transform(X = kproto.cluster_centroids_[0]), columns = df_num_norm.columns)
+cluster_centroids_c = pd.concat([cluster_centroids_num_c,pd.DataFrame(kproto.cluster_centroids_[1])], axis=1)
+cluster_centroids_c.columns = df_fill_norm.columns
 
-
-
+#3 or 4 clusters
+#if 4: 2 clusters for old ppl w/ low and high claim raie; 2 clusters for "younger" (70s)ppl with low and high claim rate
+#if 3: 3 different age groups (40s, 60s, 70s) with mid high, low and very high claim rates respctivlly
 
