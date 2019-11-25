@@ -35,7 +35,7 @@ multipliers = {'first_policy': 0,'birth_year': 0, 'salary_year': 5,'mon_value': 
 
 outliers = []
 for col, multi in multipliers.items():
-	outliers.append(get_outliers_i(col, multi))
+	outliers.append(get_outliers_i(df_num, col, multi))
 
 df_outlier = df_num.iloc[list(set([o for l in outliers for o in l]))]
 df = df[~df.index.isin(df_outlier.index.values)]
@@ -87,13 +87,7 @@ df_prod_norm = pd.DataFrame(prod_norm, columns = ['premium_motor','premium_house
 
 ### Find number of clusters
 # Elbow graph
-product_clusters = []
-
-#for i in range(1,10):
-#    kmeans = KMeans(n_clusters=i, random_state=1).fit(df_prod_norm)
-#    product_clusters.append(kmeans.inertia_)
-#    print(i) 
-#plt.plot(range(1,10), product_clusters)	# 2 or 3 clusters
+create_elbowgraph(n_clusters, df_norm)
 
 #Silhouette
 

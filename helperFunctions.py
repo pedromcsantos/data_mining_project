@@ -11,17 +11,17 @@ from sklearn.metrics import silhouette_samples
 from sklearn.metrics import silhouette_score  #avg of avgs
 
 
-def calc_threshold(column_name, multiplier):
-	Q1 = df_num[column_name].quantile(0.25)
-	Q3 = df_num[column_name].quantile(0.75)
+def calc_threshold(df_num, column, multiplier):
+	Q1 = df_num[column].quantile(0.25)
+	Q3 = df_num[column].quantile(0.75)
 	IQR = Q3 - Q1
 	return IQR * multiplier
 
-def get_outliers_i(column, multiplier):
+def get_outliers_i(df_num, column, multiplier):
 	if multiplier == 0:
 		return []
-	th_pos = calc_threshold(column, multi) + df_num[column].mean()
-	th_neg = df_num[column].mean() - calc_threshold(column, multi)
+	th_pos = calc_threshold(column, multiplier) + df_num[column].mean()
+	th_neg = df_num[column].mean() - calc_threshold(column, multiplier)
 	outliers_i = df_num[(df_num[column] >= th_pos) | (df_num[column] <= th_neg)].index.values
 	return outliers_i
 
@@ -47,3 +47,12 @@ def create_silgraph(df, labels):
 	
 	    # Compute the new y_lower for next plot
 	    y_lower = y_upper + 10  # 10 for the 0 samples
+
+def create_elbowgraph(n, df):
+	product_clusters = []
+
+	for i in range(1,n):
+	    kmeans = KMeans(n_clusters=i, random_state=1).fit(df)
+	    product_clusters.append(kmeans.inertia_)
+	    print("Calculated kmeans with" + str(i) + " clusters") 
+	plt.plot(range(1,10), product_clusters)	# 2 or 3 clusters
