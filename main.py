@@ -94,6 +94,7 @@ create_elbowgraph(10, df_prod_norm)
 #Silhouette
 n_clusters = 3
 kmeans = KMeans(n_clusters=3, random_state=1).fit(df_prod_norm)
+df["p_cluster"] = kmeans.labels_
 
 silhouette_avg = silhouette_score(df_prod_norm, kmeans.labels_)
 print("For n_clusters =", n_clusters, "the average silhouette_score is :", silhouette_avg) 
@@ -139,7 +140,7 @@ create_elbowgraph(10, df_cust_num_norm)
 kmeans_cust = KMeans(n_clusters=4, random_state=1).fit(df_cust_num_norm)
 
 # Model predict
-df["cluster"] = kmeans_cust.labels_
+df["c_cluster"] = kmeans_cust.labels_
 
 create_silgraph(df_cust_num_norm,kmeans_cust.labels_ )
 silhouette_avg = silhouette_score(df_cust_num_norm, kmeans_cust.labels_)
