@@ -213,6 +213,9 @@ graph.write_png('decision_tree_cluster.png')
 
 
 
+## 
+#df.to_csv("insurance_clusters.csv")
+
 
 
 
