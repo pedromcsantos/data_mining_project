@@ -36,7 +36,6 @@ df_num = pd.DataFrame(df[['first_policy','birth_year', 'salary_year','mon_value'
 	
 # Define individual multipliers for features
 multipliers = {'first_policy': 0,'birth_year': 0, 'salary_year': 5,'mon_value': 5,'claims_rate': 5,'premium_motor': 5,'premium_household': 5,'premium_health': 5,'premium_life': 5,'premium_work_comp': 5}
-
 outliers = []
 for col, multi in multipliers.items():
 	outliers.append(get_outliers_i(df_num, col, multi))
@@ -71,14 +70,13 @@ df["premium_total"] = [sum(p for p in premiums if p > 0) for i, premiums in df[[
 
 # Number of parts which customers cancelled this year (has a negative value in the premium-related columns)
 df["cancelled_contracts"] = [sum(1 for p in premiums if p < 0) for i, premiums in df[['premium_motor','premium_household','premium_health', 'premium_life','premium_work_comp']].iterrows()]
+df["nr_contracts"] = [sum(1 for p in premiums if p > 0) for i, premiums in df[['premium_motor','premium_household','premium_health', 'premium_life','premium_work_comp']].iterrows()]
 
 # Split the features in customer- and product-related. 
 customer_related_num = ['birth_year', 'salary_year',  'mon_value', 'claims_rate', 'customer_since', 'premium_total']
-customer_related_cat = ['location','has_children','is_family_policy', 'educ', 'cancelled_contracts']
+customer_related_cat = ['location','has_children','is_family_policy', 'educ', 'cancelled_contracts', 'nr_contracts']
 customer_related = customer_related_num + customer_related_cat
 product_related = ['premium_motor','premium_household', 'premium_health', 'premium_life','premium_work_comp']
-
-#### We could transform education into a intervall scala 
 
 ################# Choose algorithm #################
 ######### Product-related #########
@@ -110,14 +108,14 @@ cluster_centroids_num = pd.DataFrame(scaler.inverse_transform(X=kmeans.cluster_c
 ### K-Prototype with categorical and numerical Features ###
 # Normalization for Customer
 scaler = StandardScaler()
-cust_norm = scaler.fit_transform(df[['birth_year', 'salary_year', 'mon_value', 'claims_rate', 'customer_since', 'premium_total', 'cancelled_contracts']])
-df_num_norm = pd.DataFrame(cust_norm, columns = ['birth_year', 'salary_year', 'mon_value', 'claims_rate', 'customer_since', 'premium_total', 'cancelled_contracts'])
-df_cust_norm =df_num_norm.join(df[["educ","location","has_children", 'is_family_policy']])
+cust_norm = scaler.fit_transform(df[['birth_year', 'salary_year', 'mon_value', 'claims_rate', 'customer_since', 'premium_total']])
+df_num_norm = pd.DataFrame(cust_norm, columns = ['birth_year', 'salary_year', 'mon_value', 'claims_rate', 'customer_since', 'premium_total'])
+df_cust_norm =df_num_norm.join(df[["educ","location","has_children", 'is_family_policy', 'cancelled_contracts', "nr_contracts"]])
 
 # Elbow graph
-create_elbowgraph(10, df_cust_norm, "kproto", [7,8,9,10] )
+# create_elbowgraph(10, df_cust_norm, "kproto", [6,7,8,9,10,11] )
 
-kproto = KPrototypes(n_clusters=3, init='random', random_state=1).fit(df_cust_norm, categorical=[7,8,9,10])
+kproto = KPrototypes(n_clusters=3, init='random', random_state=1).fit(df_cust_norm, categorical=[6,7,8,9,10,11])
 
 # Inverse Normalization for Interpretation
 cluster_centroids_num_c = pd.DataFrame(scaler.inverse_transform(X = kproto.cluster_centroids_[0]), columns = df_num_norm.columns)
@@ -135,8 +133,17 @@ scaler = StandardScaler()
 cust_norm = scaler.fit_transform(df[customer_related_num])
 df_cust_num_norm = pd.DataFrame(cust_norm, columns = customer_related_num)
 
+create_elbowgraph(10, df_cust_num_norm)
+
 # Model fit
-kmeans_cust = KMeans(n_clusters=3, random_state=1).fit(df_cust_num_norm)
+kmeans_cust = KMeans(n_clusters=4, random_state=1).fit(df_cust_num_norm)
+
+# Model predict
+df["cluster"] = kmeans_cust.labels_
+
+create_silgraph(df_cust_num_norm,kmeans_cust.labels_ )
+silhouette_avg = silhouette_score(df_cust_num_norm, kmeans_cust.labels_)
+print("the average silhouette_score is :", silhouette_avg) 
 
 # Inverse Normalization for Interpretation
 cluster_centroids_cust_num = pd.DataFrame(scaler.inverse_transform(X=kmeans_cust.cluster_centers_), columns = customer_related_num)
@@ -175,13 +182,16 @@ df_cust["cluster"] = [cc_cust_num_l.loc[i,"cluster"] for i in df_cust["k_cluster
 
 # Silhoutte graph
 create_silgraph(df_cust_num_norm, df_cust["cluster"])
+silhouette_avg = silhouette_score(df_cust_num_norm, df_cust["cluster"])
+print("the average silhouette_score is :", silhouette_avg) 
 
+cc_cust_num_norm = df_cust.groupby("cluster").mean()
 
 #################################################################
 ################## Decision Tree classifier #####################
 
-X = df_cust.iloc[:,:-1]
-y = df_cust.iloc[:,-1]
+X = df[customer_related_num].iloc[:,:-1]
+y = df["cluster"]
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=1) 
 
 clf = DecisionTreeClassifier()
