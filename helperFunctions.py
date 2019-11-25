@@ -20,15 +20,15 @@ def calc_threshold(df_num, column, multiplier):
 def get_outliers_i(df_num, column, multiplier):
 	if multiplier == 0:
 		return []
-	th_pos = calc_threshold(column, multiplier) + df_num[column].mean()
-	th_neg = df_num[column].mean() - calc_threshold(column, multiplier)
+	th_pos = calc_threshold(df_num, column, multiplier) + df_num[column].mean()
+	th_neg = df_num[column].mean() - calc_threshold(df_num, column, multiplier)
 	outliers_i = df_num[(df_num[column] >= th_pos) | (df_num[column] <= th_neg)].index.values
 	return outliers_i
 
 def create_silgraph(df, labels):
 	sample_silhouette_values = silhouette_samples(df, labels )
 	
-	n_clusters = len(labels.unique())
+	n_clusters = len(np.unique(labels))
 	y_lower = 100
 	fig = plt.figure()
 	ax1 = fig.add_subplot(111)
@@ -48,11 +48,19 @@ def create_silgraph(df, labels):
 	    # Compute the new y_lower for next plot
 	    y_lower = y_upper + 10  # 10 for the 0 samples
 
-def create_elbowgraph(n, df):
-	product_clusters = []
-
-	for i in range(1,n):
-	    kmeans = KMeans(n_clusters=i, random_state=1).fit(df)
-	    product_clusters.append(kmeans.inertia_)
-	    print("Calculated kmeans with" + str(i) + " clusters") 
-	plt.plot(range(1,10), product_clusters)	# 2 or 3 clusters
+def create_elbowgraph(n, df, type="kmeans", categorical=[0]):
+	if type == "kmeans":
+		clusters = []
+		for i in range(1,n):
+		    kmeans = KMeans(n_clusters=i, random_state=1).fit(df)
+		    clusters.append(kmeans.inertia_)
+		    print("Calculated kmeans with " + str(i) + " clusters") 
+	
+	elif type == "kproto": 
+		clusters = []
+		for i in range(1,n):
+		    kproto = KPrototypes(n_clusters=i, init='random', random_state=1).fit(df, categorical=categorical)
+		    clusters.append(kproto.cost_)
+		    print("Calculated kproto with " + str(i) + " clusters") 
+	
+	plt.plot(range(1,n), clusters)

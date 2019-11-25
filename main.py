@@ -4,13 +4,17 @@ import numpy as np
 from sklearn.preprocessing import StandardScaler
 from kmodes.kprototypes import KPrototypes
 from sklearn.cluster import KMeans
-import matplotlib.cm as cm
 from sklearn.cluster import AgglomerativeClustering
 import scipy.cluster.hierarchy as shc
-from sklearn.metrics import silhouette_samples 
 from sklearn.metrics import silhouette_score  #avg of avgs
-
-from helperFunctions import create_silgraph, get_outliers_i
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.model_selection import train_test_split 
+from sklearn import metrics 
+from sklearn.tree import export_graphviz
+from sklearn.externals.six import StringIO  
+from IPython.display import Image  
+import pydotplus
+from helperFunctions import create_silgraph, get_outliers_i, create_elbowgraph
 
 
 df = pd.read_csv("A2Z Insurance.csv")
@@ -87,26 +91,20 @@ df_prod_norm = pd.DataFrame(prod_norm, columns = ['premium_motor','premium_house
 
 ### Find number of clusters
 # Elbow graph
-create_elbowgraph(n_clusters, df_norm)
+create_elbowgraph(10, df_prod_norm)
 
 #Silhouette
-
 n_clusters = 3
+kmeans = KMeans(n_clusters=3, random_state=1).fit(df_prod_norm)
 
 silhouette_avg = silhouette_score(df_prod_norm, kmeans.labels_)
-print("For n_clusters =", n_clusters,
-          "The average silhouette_score is :", silhouette_avg) 
+print("For n_clusters =", n_clusters, "the average silhouette_score is :", silhouette_avg) 
 
 # Compute the silhouette scores for each sample
 create_silgraph(df_prod_norm,kmeans.labels_ )
 
-kmeans = KMeans(n_clusters=3, random_state=1).fit(df_prod_norm)
-
 # Inverse Normalization for Interpretation
 cluster_centroids_num = pd.DataFrame(scaler.inverse_transform(X=kmeans.cluster_centers_), columns = df_prod_norm.columns)
-
-#2 clusters : Clients that prefer motor insurance and Clients that prefer the others
-#3 clusters: Clients that prefer motor insurance and low on the others, Clients that prefer Health and moderate on the others, and Clients that are High on life, household and work and moderate on the others
 
 ######### Customer-related ##########
 ### K-Prototype with categorical and numerical Features ###
@@ -116,13 +114,8 @@ cust_norm = scaler.fit_transform(df[['birth_year', 'salary_year', 'mon_value', '
 df_num_norm = pd.DataFrame(cust_norm, columns = ['birth_year', 'salary_year', 'mon_value', 'claims_rate', 'customer_since', 'premium_total', 'cancelled_contracts'])
 df_cust_norm =df_num_norm.join(df[["educ","location","has_children", 'is_family_policy']])
 
-#customer_clusters = []
-
-#for i in range(1,10):
-#    kproto = KPrototypes(n_clusters=i, init='random', random_state=1).fit(df_cust_norm, categorical=[5,6,7])
-#    customer_clusters.append(kproto.cost_)
-#    print(i) 
-#plt.plot(range(1,10), customer_clusters)	
+# Elbow graph
+create_elbowgraph(10, df_cust_norm, "kproto", [7,8,9,10] )
 
 kproto = KPrototypes(n_clusters=3, init='random', random_state=1).fit(df_cust_norm, categorical=[7,8,9,10])
 
@@ -168,6 +161,7 @@ cc_cust_num_l = pd.DataFrame(kmeans_cust_l.cluster_centers_, columns = customer_
 
 # Create dendogram
 dend = shc.dendrogram(shc.linkage(cc_cust_num_l, method='ward'))
+# 4 clusters
 
 # Agglomerative Hierarchical Clustering 
 cc_cust_num_l["cluster"] = AgglomerativeClustering(n_clusters=4).fit_predict(cc_cust_num_l)
@@ -183,12 +177,28 @@ df_cust["cluster"] = [cc_cust_num_l.loc[i,"cluster"] for i in df_cust["k_cluster
 create_silgraph(df_cust_num_norm, df_cust["cluster"])
 
 
+#################################################################
+################## Decision Tree classifier #####################
 
+X = df_cust.iloc[:,:-1]
+y = df_cust.iloc[:,-1]
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=1) 
 
+clf = DecisionTreeClassifier()
+# Fit model
+clf = clf.fit(X_train,y_train)
+#Predict the cluster for test data
+y_pred = clf.predict(X_test)
+print("Accuracy:",metrics.accuracy_score(y_test, y_pred))
 
+dot_data = StringIO()
+export_graphviz(clf, out_file=dot_data,  
+                filled=True,
+                special_characters=True,feature_names = X.columns.values,class_names=['0','1', '3', '4'])
+graph = pydotplus.graph_from_dot_data(dot_data.getvalue())  
+graph.write_png('decision_tree_cluster.png')
 
-
-
+# Predict cluster of outliers 
 
 
 
