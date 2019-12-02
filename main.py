@@ -10,6 +10,7 @@ from sklearn import metrics
 from sklearn.tree import export_graphviz
 from sklearn.externals.six import StringIO  
 import pydotplus
+from kmodes.kmodes import KModes
 from helperFunctions import create_silgraph, get_outliers_i, create_elbowgraph
 
 
@@ -57,13 +58,17 @@ df.reset_index(drop=True, inplace=True)
 # Calculate total amount paid for premiums per year per customer
 df["premium_total"] = [sum(p for p in premiums if p > 0) for i, premiums in df[['premium_motor','premium_household','premium_health', 'premium_life','premium_work_comp']].iterrows()]
 
-# Number of parts which customers cancelled this year (has a negative value in the premium-related columns)
-df["cancelled_contracts"] = [sum(1 for p in premiums if p < 0) for i, premiums in df[['premium_motor','premium_household','premium_health', 'premium_life','premium_work_comp']].iterrows()]
-df["nr_contracts"] = [sum(1 for p in premiums if p > 0) for i, premiums in df[['premium_motor','premium_household','premium_health', 'premium_life','premium_work_comp']].iterrows()]
+# True if customer cancelled contract this year (has a negative value in the premium-related columns)
+temp = [sum(1 for p in premiums if p < 0) for i, premiums in df[['premium_motor','premium_household','premium_health', 'premium_life','premium_work_comp']].iterrows()]
+df["cancelled_contracts"] = [1 if i != 0 else 0 for i in temp]
+
+# True if customers has premium for every part
+temp = [sum(1 for p in premiums if p > 0) for i, premiums in df[['premium_motor','premium_household','premium_health', 'premium_life','premium_work_comp']].iterrows()]
+df["has_all"] = [1 if i == 5 else 0 for i in temp]
 
 # Split the features in customer- and product-related. 
-customer_related_num = [ 'salary_year',  'mon_value', 'claims_rate', 'premium_total']
-customer_related_cat = ['location','has_children', 'educ', 'cancelled_contracts', 'nr_contracts']
+customer_related_num = ['salary_year', 'mon_value',  'claims_rate', 'premium_total'] # dont use first_policy because the clusters are clearer without
+customer_related_cat = ['location','has_children', 'educ', 'cancelled_contracts', 'has_all']
 customer_related = customer_related_num + customer_related_cat
 product_related = ['premium_motor','premium_household', 'premium_health', 'premium_life','premium_work_comp']
 
@@ -95,8 +100,6 @@ create_silgraph(df_prod_norm,kmeans.labels_ )
 cluster_centroids_num = pd.DataFrame(scaler.inverse_transform(X=kmeans.cluster_centers_), columns = df_prod_norm.columns)
 
 ######### Customer-related ##########
-
-
 ################ K-Means with only numerical Features #################
 # Normalization
 scaler = StandardScaler()
@@ -143,33 +146,56 @@ graph.write_png('decision_tree_cluster.png')
 
 # Predict clusters of outliers and dropped customers
 # c_cluster
-df_topred = pd.concat([df_outlier,df_dropped], axis=0)
+df_add = pd.concat([df_outlier,df_dropped], axis=0)
 num_cols = ['salary_year',  'mon_value', 'claims_rate']
-df_topred = df_topred[num_cols]
+df_topredc = pd.DataFrame(df_add[num_cols])
 trained_models = {}
-pred_clusters = []
-df_topred.reset_index(drop=True, inplace=True)
+pred_cclusters = []
+df_topredc.reset_index(drop=True, inplace=True)
+df_add.reset_index(drop=True, inplace=True)
 
-for i in df_topred.index.values:
-	isna = df_topred.iloc[i,:].isna()
+for i in df_topredc.index.values:
+	isna = df_topredc.iloc[i,:].isna()
 	cols = [num_cols[j] for j in range(0,len(num_cols)) if isna[j] == False]
 	if ', '.join(cols) in trained_models.keys():
-		y_pred = trained_models[', '.join(cols)].predict([df_topred.loc[i,cols]])
-		pred_clusters.append({i:y_pred[0]})
+		y_pred = trained_models[', '.join(cols)].predict([df_topredc.loc[i,cols]])
+		pred_cclusters.append(y_pred[0])
 		continue	
 	else:	
 		X = df[cols]
 		y = df["c_cluster"]
 		clf = DecisionTreeClassifier()
 		clf = clf.fit(X,y)
-		y_pred = clf.predict([df_topred.loc[i,cols]])
-		pred_clusters.append({i:y_pred[0]})
+		y_pred = clf.predict([df_topredc.loc[i,cols]])
+		pred_cclusters.append(y_pred[0])
 		trained_models[', '.join(cols)] = clf
 
+# p_cluster 
+pcols = ["premium_motor","premium_household","premium_health","premium_life","premium_work_comp"]
+#Assumption: nan values in premium mean no contract 
+df_topredp = pd.DataFrame(df_add[pcols])
+df_topredp = df_topredp.fillna(0)
 
+X = df[pcols]
+y = df["p_cluster"]
+clf = DecisionTreeClassifier()
+clf = clf.fit(X,y)
+pred_pclusters = clf.predict(df_topredp)
+
+# Add outliers and dropped customers to main dataframe 
+
+df_add["premium_total"] = [sum(p for p in premiums if p > 0) for i, premiums in df_add[['premium_motor','premium_household','premium_health', 'premium_life','premium_work_comp']].iterrows()]
+temp = [sum(1 for p in premiums if p < 0) for i, premiums in df_add[['premium_motor','premium_household','premium_health', 'premium_life','premium_work_comp']].iterrows()]
+df_add["cancelled_contracts"] = [1 if i != 0 else 0 for i in temp]
+temp = [sum(1 for p in premiums if p > 0) for i, premiums in df_add[['premium_motor','premium_household','premium_health', 'premium_life','premium_work_comp']].iterrows()]
+df_add["has_all"] = [1 if i == 5 else 0 for i in temp]
+
+df_add["c_cluster"] = pred_cclusters
+df_add["p_cluster"] = pred_pclusters
+
+df = df.append(df_add)
 ## 
-##df.to_csv("insurance_clusters.csv")
-
+df.to_csv("insurance_clusters.csv")
 
 
 

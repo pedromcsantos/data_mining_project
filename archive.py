@@ -147,4 +147,35 @@ print("the average silhouette_score is :", silhouette_avg)
 cc_cust_num = df_cust.groupby("cluster").mean()
 		
 ##### Reason for not using it: Similar clusters but lower silhouettes score			
-			
+	
+
+
+kmodes = KModes(n_clusters=4)
+clusters = kmodes.fit_predict(df[customer_related_cat])
+kmcc = pd.DataFrame(kmodes.cluster_centroids_, columns=customer_related_cat)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+		
