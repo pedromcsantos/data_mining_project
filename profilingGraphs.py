@@ -6,9 +6,9 @@ from plotly.io import write_image
 
 df = pd.read_csv("insurance_clusters.csv", index_col=0)
 
-cust_num = ['birth_year', 'salary_year', 'mon_value', 'claims_rate','customer_since', 'premium_total']
+cust_num = ['salary_year', 'mon_value', 'claims_rate', 'premium_total']
 prod_num = ['premium_motor', 'premium_household', 'premium_health', 'premium_life', 'premium_work_comp']
-cat = [ 'educ', 'location', 'has_children', 'is_family_policy', 'cancelled_contracts', 'nr_contracts']
+cat = [ 'educ', 'location', 'has_children', 'cancelled_contracts', 'nr_contracts']
 
 c_cust_num_mean = df[cust_num + ["c_cluster"]].groupby("c_cluster").mean()
 c_cat_mode = df[cat + ["c_cluster"]].groupby("c_cluster").agg(lambda x:x.value_counts().index[0])
