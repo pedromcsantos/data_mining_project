@@ -14,7 +14,7 @@ from kmodes.kmodes import KModes
 from helperFunctions import create_silgraph, get_outliers_i, create_elbowgraph
 
 
-df = pd.read_csv("A2Z Insurance.csv")
+df = pd.read_csv("data/A2Z Insurance.csv")
 
 # Preprocessing
 df = df.set_index("Customer Identity")

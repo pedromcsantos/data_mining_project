@@ -4,7 +4,7 @@ import plotly.graph_objects as go
 from plotly.offline import plot
 from plotly.io import write_image
 
-df = pd.read_csv("insurance_clusters.csv", index_col=0)
+df = pd.read_csv("data/insurance_clusters.csv", index_col=0)
 
 cust_num = ['salary_year', 'mon_value', 'claims_rate', 'premium_total']
 prod_num = ['premium_motor', 'premium_household', 'premium_health', 'premium_life', 'premium_work_comp']

@@ -5,7 +5,7 @@ import seaborn as sb
 import plotly.graph_objs as go
 import plotly.offline as pyo
 
-df = pd.read_csv("insurance_clusters.csv", index_col = 0)
+df = pd.read_csv("data/insurance_clusters.csv", index_col = 0)
 
 categoricals = ["educ","location","has_children","cancelled_contracts","has_all"]
 numericals = ["salary_year","mon_value","claims_rate","premium_motor","premium_household","premium_health","premium_life","premium_work_comp","premium_total"]

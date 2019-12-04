@@ -20,8 +20,8 @@ def calc_threshold(df_num, column, multiplier):
 def get_outliers_i(df_num, column, multiplier):
 	if multiplier == 0:
 		return []
-	th_pos = calc_threshold(df_num, column, multiplier) + df_num[column].mean()
-	th_neg = df_num[column].mean() - calc_threshold(df_num, column, multiplier)
+	th_pos = calc_threshold(df_num, column, multiplier) + df_num[column].quantile(0.75)
+	th_neg = df_num[column].quantile(0.25) - calc_threshold(df_num, column, multiplier)
 	outliers_i = df_num[(df_num[column] >= th_pos) | (df_num[column] <= th_neg)].index.values
 	return outliers_i
 
