@@ -32,10 +32,13 @@ df.reset_index(inplace=True,drop=True)
 df_num = pd.DataFrame(df[['first_policy', 'salary_year','mon_value','claims_rate','premium_motor','premium_household','premium_health','premium_life','premium_work_comp']])
 	
 # Define individual multipliers for features
-multipliers = {'first_policy': 0, 'salary_year': 5,'mon_value': 5,'claims_rate': 5,'premium_motor': 5,'premium_household': 5,'premium_health': 5,'premium_life': 5,'premium_work_comp': 5}
+thresholds = {'salary_year': 200000,'mon_value': -1000,'claims_rate': 3,'premium_motor': 600,'premium_household': 1600,'premium_health': 400,'premium_life': 300,'premium_work_comp': 300}
 outliers = []
-for col, multi in multipliers.items():
-	outliers.append(get_outliers_i(df_num, col, multi))
+for col, th in thresholds.items():
+	direct = "pos"
+	if col == "mon_value":
+		direct = "neg"
+	outliers.append(get_outliers_i(df_num, col, th, direct))
 
 df_outlier = df.iloc[list(set([o for l in outliers for o in l]))]
 df = df[~df.index.isin(df_outlier.index.values)]
@@ -194,8 +197,23 @@ df_add["c_cluster"] = pred_cclusters
 df_add["p_cluster"] = pred_pclusters
 
 df = df.append(df_add)
-## 
-df.to_csv("insurance_clusters.csv")
+
+#filling NAN in premiums with zeros (see assumption above)
+df[["premium_motor","premium_household","premium_health","premium_life","premium_work_comp"]] = df[["premium_motor","premium_household","premium_health","premium_life","premium_work_comp"]].fillna(0)
+
+#Missing values in salary_year(numerical): calculate salary_year mean for each cluster
+salary_mean = df.pivot_table(values="salary_year",index="c_cluster",aggfunc="mean")
+#Missing values in education and has_children(categorival): calculate mode for each cluster
+cat_mode = df[["has_children", "educ", "c_cluster"]].groupby("c_cluster").agg(lambda x: x.mode())
+
+#filling missing data by mean and mode of each cluster
+for i in range(4):
+    df["salary_year"][df["c_cluster"]==i]=df["salary_year"][df["c_cluster"]==i].fillna(salary_mean.iloc[i][0])
+    df["educ"][df["c_cluster"]==i] = df["educ"][df["c_cluster"]==i].fillna(cat_mode.iloc[i][1])
+    df["has_children"][df["c_cluster"]==i]=df["has_children"][df["c_cluster"]==i].fillna(cat_mode.iloc[i][0])
+	
+print(df.isnull().sum())
+df.to_csv("data/insurance_clusters.csv")
 
 
 

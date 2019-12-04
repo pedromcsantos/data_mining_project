@@ -11,18 +11,13 @@ from sklearn.metrics import silhouette_samples
 from sklearn.metrics import silhouette_score  #avg of avgs
 
 
-def calc_threshold(df_num, column, multiplier):
-	Q1 = df_num[column].quantile(0.25)
-	Q3 = df_num[column].quantile(0.75)
-	IQR = Q3 - Q1
-	return IQR * multiplier
-
-def get_outliers_i(df_num, column, multiplier):
-	if multiplier == 0:
+def get_outliers_i(df_num, column, threshold, direction="pos"):
+	if threshold == 0:
 		return []
-	th_pos = calc_threshold(df_num, column, multiplier) + df_num[column].quantile(0.75)
-	th_neg = df_num[column].quantile(0.25) - calc_threshold(df_num, column, multiplier)
-	outliers_i = df_num[(df_num[column] >= th_pos) | (df_num[column] <= th_neg)].index.values
+	if direction == "pos":
+		outliers_i = df_num[df_num[column] > threshold].index.values
+	if direction == "neg":
+		outliers_i = df_num[df_num[column] < threshold].index.values
 	return outliers_i
 
 def create_silgraph(df, labels):
