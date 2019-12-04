@@ -216,4 +216,3 @@ print(df.isnull().sum())
 df.to_csv("data/insurance_clusters.csv")
 
 
-
