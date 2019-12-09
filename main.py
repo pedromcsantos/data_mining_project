@@ -28,13 +28,15 @@ df["salary_monthly"] = df["salary_monthly"]*12 #multiple salary by 12 to have ev
 df.rename(columns={"salary_monthly":"salary_year"}, inplace = True)
 df = df.drop("birth_year", axis=1) #Drop birth_year for clustering; consider it for interpretation
 df = df[df["first_policy"]<50000] #Drop one case where first_policy year <50000 
+#df = df[~(df["premium_motor"]==0)&~(df["premium_household"]==0)&~(df["premium_health"]==0)&~(df["premium_life"]==0)&~(df["premium_work_comp"]==0)]
+df = df[df[["premium_motor","premium_household","premium_health","premium_life","premium_work_comp"]].sum(axis=1)!=0]
 
 #####################################################################################
 ################# Outlier #################
 df.reset_index(inplace=True,drop=True)
 df_num = pd.DataFrame(df[['first_policy', 'salary_year','mon_value','claims_rate','premium_motor','premium_household','premium_health','premium_life','premium_work_comp']])
 # Define individual multipliers for features
-thresholds = {'salary_year': 200000,'mon_value': -1000,'claims_rate': 3,'premium_motor': 600,'premium_household': 1600,'premium_health': 400,'premium_life': 300,'premium_work_comp': 300}
+thresholds = {'salary_year': 200000,'mon_value': -200,'claims_rate': 3,'premium_motor': 600,'premium_household': 1600,'premium_health': 400,'premium_life': 300,'premium_work_comp': 300}
 outliers = []
 for col, th in thresholds.items():
 	direct = "pos"
@@ -66,6 +68,9 @@ df["cancelled_contracts"] = [1 if i != 0 else 0 for i in temp]
 # True if customers has premium for every part
 temp = [sum(1 for p in premiums if p > 0) for i, premiums in df[['premium_motor','premium_household','premium_health', 'premium_life','premium_work_comp']].iterrows()]
 df["has_all"] = [1 if i == 5 else 0 for i in temp]
+
+#Calculate if customers are profitable
+df["is_profit"] = [1 if mon_value > 0 else 0 for mon_value in df.mon_value.values]
 
 # Split the features in customer- and product-related. 
 customer_related_num = ['salary_year', 'mon_value',  'claims_rate', 'premium_total'] # dont use first_policy because the clusters are clearer without
@@ -174,7 +179,7 @@ export_graphviz(clf, out_file=dot_data,
                 filled=True,
                 special_characters=True,feature_names = X.columns.values,class_names=['0','1', '3', '4'])
 graph = pydotplus.graph_from_dot_data(dot_data.getvalue())  
-graph.write_png('decision_tree_cluster.png')
+#graph.write_png('decision_tree_cluster.png')
 
 # Predict clusters of outliers and dropped customers
 # c_cluster
@@ -241,7 +246,9 @@ for i in range(3):
     df["salary_year"][df["c_cluster"]==i]=df["salary_year"][df["c_cluster"]==i].fillna(salary_mean.iloc[i][0])
     df["educ"][df["c_cluster"]==i] = df["educ"][df["c_cluster"]==i].fillna(cat_mode.iloc[i][1])
     df["has_children"][df["c_cluster"]==i]=df["has_children"][df["c_cluster"]==i].fillna(cat_mode.iloc[i][0])
-	
+
+df["is_profit"] = [1 if mon_value > 0 else 0 for mon_value in df.mon_value.values]
+
 print(df.isnull().sum())
 df.to_csv("data/insurance_clusters.csv")
 
