@@ -265,6 +265,7 @@ df_add["c_cluster"] = pred_cclusters
 df_add["p_cluster"] = pred_pclusters
 
 df = df.append(df_add)
+df = df.reset_index()
 
 #filling NAN in premiums with zeros (see assumption above)
 df[["premium_motor","premium_household","premium_health","premium_life","premium_work_comp"]] = df[["premium_motor","premium_household","premium_health","premium_life","premium_work_comp"]].fillna(0)
@@ -281,6 +282,6 @@ for i in range(4):
     df["has_children"][df["c_cluster"]==i]=df["has_children"][df["c_cluster"]==i].fillna(cat_mode.iloc[i][0])
 	
 print(df.isnull().sum())
-#df.to_csv("data/insurance_clusters.csv")
+df.to_csv("data/insurance_clusters.csv")
 
 
