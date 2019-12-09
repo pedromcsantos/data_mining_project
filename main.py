@@ -91,11 +91,11 @@ df_prod_norm = pd.DataFrame(prod_norm, columns = ['premium_motor','premium_house
 #create_elbowgraph(10, df_prod_norm)
 
 #Silhouette
-kmeans = KMeans(n_clusters=3, random_state=1).fit(df_prod_norm)
+kmeans = KMeans(n_clusters=2, random_state=1).fit(df_prod_norm)
 df["p_cluster"] = kmeans.labels_
 
 silhouette_avg = silhouette_score(df_prod_norm, kmeans.labels_)
-print("For n_clusters =", str(3), "the average silhouette_score is :", silhouette_avg) 
+print("For n_clusters =", str(2), "the average silhouette_score is :", silhouette_avg) 
 
 # Compute the silhouette scores for each sample
 #create_silgraph(df_prod_norm,kmeans.labels_ )
