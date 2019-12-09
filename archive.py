@@ -155,9 +155,81 @@ clusters = kmodes.fit_predict(df[customer_related_cat])
 kmcc = pd.DataFrame(kmodes.cluster_centroids_, columns=customer_related_cat)
 
 
+###### Categorical Kmodes ########
+kmodes = KModes(n_clusters=4)
+temp_kmodes = kmodes.fit_predict(df[customer_related_cat])
+kmcc = pd.DataFrame(kmodes.cluster_centroids_, columns=customer_related_cat)
+
+df["cat_cluster"] = temp_kmodes
+
+
+################ K-Means with only numerical Features #################
+# Normalization
+scaler = StandardScaler()
+cust_norm = scaler.fit_transform(df[customer_related_num])
+df_cust_num_norm = pd.DataFrame(cust_norm, columns = customer_related_num)
+
+#create_elbowgraph(10, df_cust_num_norm)
+
+# Model fit
+kmeans_cust = KMeans(n_clusters=4, random_state=1).fit(df_cust_num_norm)
+
+# Model predict
+df["kmc_cluster"] = kmeans_cust.labels_
+
+#create_silgraph(df_cust_num_norm,kmeans_cust.labels_ )
+silhouette_avg = silhouette_score(df_cust_num_norm, kmeans_cust.labels_)
+print("the average silhouette_score is :", silhouette_avg) 
+
+# Inverse Normalization for Interpretation
+cluster_centroids_cust_num = pd.DataFrame(scaler.inverse_transform(X=kmeans_cust.cluster_centers_), columns = customer_related_num)
 
 
 
+
+## SOM and K-Means ##
+scaler = StandardScaler()
+cust_norm = scaler.fit_transform(df[customer_related_num])
+df_cust_norm = pd.DataFrame(cust_norm, columns = customer_related_num)
+
+X = df_cust_norm.values
+
+sm = SOMFactory().build(data = X,
+               mapsize=(8,8),
+               normalization = 'var',
+               initialization="pca",
+               component_names=customer_related_num,
+               lattice="hexa",
+               training ="batch" )
+
+sm.train(n_job=5,
+         verbose='info',
+         train_rough_len=40,
+         train_finetune_len=100)
+
+final_clusters = pd.DataFrame(sm._data, columns = customer_related_num)
+my_labels = pd.DataFrame(sm._bmu[0])    
+final_clusters = pd.concat([final_clusters,my_labels], axis = 1)
+cluster_cols = customer_related_num  + ["Labels"]
+final_clusters.columns = cluster_cols
+som_cluster = final_clusters.groupby("Labels").mean()
+
+create_elbowgraph(10, som_cluster)
+
+
+kmeans = KMeans(n_clusters=3, random_state=1).fit(som_cluster)
+som_cluster["somk_cluster"] = kmeans.labels_
+
+k_cluster = som_cluster.groupby("somk_cluster").mean()
+k_cluster = pd.DataFrame(scaler.inverse_transform(X=k_cluster), columns = customer_related_num)
+
+final_clusters["somk_cluster"] = [som_cluster.loc[i, "somk_cluster"] for i in final_clusters["Labels"].values ]
+
+#create_silgraph(df_cust_norm, final_clusters["k_cluster"])
+silhouette_avg = silhouette_score(df_cust_norm, final_clusters["somk_cluster"])
+print("the average silhouette_score is :", silhouette_avg) 
+
+df["somkmc_cluster"] = final_clusters["somk_cluster"]
 
 
 

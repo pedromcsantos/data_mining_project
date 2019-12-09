@@ -16,6 +16,7 @@ from sompy.sompy import SOMFactory
 from sompy.visualization.plot_tools import plot_hex_map
 import logging
 import matplotlib.pyplot as plt
+import scipy.cluster.hierarchy as shc
 
 df = pd.read_csv("data/A2Z Insurance.csv")
 
@@ -28,12 +29,10 @@ df.rename(columns={"salary_monthly":"salary_year"}, inplace = True)
 df = df.drop("birth_year", axis=1) #Drop birth_year for clustering; consider it for interpretation
 df = df[df["first_policy"]<50000] #Drop one case where first_policy year <50000 
 
-
 #####################################################################################
 ################# Outlier #################
 df.reset_index(inplace=True,drop=True)
 df_num = pd.DataFrame(df[['first_policy', 'salary_year','mon_value','claims_rate','premium_motor','premium_household','premium_health','premium_life','premium_work_comp']])
-	
 # Define individual multipliers for features
 thresholds = {'salary_year': 200000,'mon_value': -1000,'claims_rate': 3,'premium_motor': 600,'premium_household': 1600,'premium_health': 400,'premium_life': 300,'premium_work_comp': 300}
 outliers = []
@@ -48,11 +47,9 @@ df = df[~df.index.isin(df_outlier.index.values)]
 
 #####################################################################################
 ################# filling NAN #################
-
 # Filling nan values in premium columns
 #Assumption: nan values in premium mean no contract 
 df[["premium_motor","premium_household","premium_health","premium_life","premium_work_comp"]] = df[["premium_motor","premium_household","premium_health","premium_life","premium_work_comp"]].fillna(0)
-
 # Drop customers with nan values in "salary_year","educ" or "has_children" because these are only a few customers and we do not have any reasonable correlation to fill it 
 df_dropped = df[df[["salary_year","educ","has_children"]].isna().any(axis=1)]
 df = df.dropna(subset=["salary_year","educ","has_children"])
@@ -63,11 +60,9 @@ df.reset_index(drop=True, inplace=True)
 
 # Calculate total amount paid for premiums per year per customer
 df["premium_total"] = [sum(p for p in premiums if p > 0) for i, premiums in df[['premium_motor','premium_household','premium_health', 'premium_life','premium_work_comp']].iterrows()]
-
 # True if customer cancelled contract this year (has a negative value in the premium-related columns)
 temp = [sum(1 for p in premiums if p < 0) for i, premiums in df[['premium_motor','premium_household','premium_health', 'premium_life','premium_work_comp']].iterrows()]
 df["cancelled_contracts"] = [1 if i != 0 else 0 for i in temp]
-
 # True if customers has premium for every part
 temp = [sum(1 for p in premiums if p > 0) for i, premiums in df[['premium_motor','premium_household','premium_health', 'premium_life','premium_work_comp']].iterrows()]
 df["has_all"] = [1 if i == 5 else 0 for i in temp]
@@ -81,7 +76,6 @@ product_related = ['premium_motor','premium_household', 'premium_health', 'premi
 ################# Choose algorithm #################
 ######### Product-related #########
 ### K-Means ###
-
 # Normalization for product-related variables
 scaler = StandardScaler()
 prod_norm = scaler.fit_transform(df[['premium_motor','premium_household','premium_health','premium_life','premium_work_comp']])
@@ -89,43 +83,22 @@ df_prod_norm = pd.DataFrame(prod_norm, columns = ['premium_motor','premium_house
 
 ### Find number of clusters
 # Elbow graph
-create_elbowgraph(10, df_prod_norm)
+#create_elbowgraph(10, df_prod_norm)
 
 #Silhouette
 kmeans = KMeans(n_clusters=3, random_state=1).fit(df_prod_norm)
 df["p_cluster"] = kmeans.labels_
 
 silhouette_avg = silhouette_score(df_prod_norm, kmeans.labels_)
-print("For n_clusters =", n_clusters, "the average silhouette_score is :", silhouette_avg) 
+print("For n_clusters =", str(3), "the average silhouette_score is :", silhouette_avg) 
 
 # Compute the silhouette scores for each sample
-create_silgraph(df_prod_norm,kmeans.labels_ )
+#create_silgraph(df_prod_norm,kmeans.labels_ )
 
 # Inverse Normalization for Interpretation
-cluster_centroids_num = pd.DataFrame(scaler.inverse_transform(X=kmeans.cluster_centers_), columns = df_prod_norm.columns)
+pcluster_centroids_num = pd.DataFrame(scaler.inverse_transform(X=kmeans.cluster_centers_), columns = df_prod_norm.columns)
 
 ######### Customer-related ##########
-################ K-Means with only numerical Features #################
-# Normalization
-scaler = StandardScaler()
-cust_norm = scaler.fit_transform(df[customer_related_num])
-df_cust_num_norm = pd.DataFrame(cust_norm, columns = customer_related_num)
-
-create_elbowgraph(10, df_cust_num_norm)
-
-# Model fit
-kmeans_cust = KMeans(n_clusters=4, random_state=1).fit(df_cust_num_norm)
-
-# Model predict
-df["c_cluster"] = kmeans_cust.labels_
-
-create_silgraph(df_cust_num_norm,kmeans_cust.labels_ )
-silhouette_avg = silhouette_score(df_cust_num_norm, kmeans_cust.labels_)
-print("the average silhouette_score is :", silhouette_avg) 
-
-# Inverse Normalization for Interpretation
-cluster_centroids_cust_num = pd.DataFrame(scaler.inverse_transform(X=kmeans_cust.cluster_centers_), columns = customer_related_num)
-
 
 ############ SOM and Hierarchical Clustering/K-Means #####################
 scaler = StandardScaler()
@@ -153,45 +126,33 @@ final_clusters = pd.concat([final_clusters,my_labels], axis = 1)
 cluster_cols = customer_related_num  + ["Labels"]
 final_clusters.columns = cluster_cols
 
-from sompy.visualization.mapview import View2DPacked
-view2D  = View2DPacked(20,20,"", text_size=7)
-view2D.show(sm, col_sz=5, what = 'codebook',)#which_dim="all", denormalize=True)
-plt.show()
-from sompy.visualization.mapview import View2D
-view2D  = View2D(20,20,"", text_size=7)
-view2D.show(sm, col_sz=5, what = 'codebook',)#which_dim="all", denormalize=True)
-plt.show()
-from sompy.visualization.bmuhits import BmuHitsView
-vhts  = BmuHitsView(12,12,"Hits Map",text_size=7)
-vhts.show(sm, anotate=True, onlyzeros=False, labelsize=10, cmap="autumn", logaritmic=False)
+#from sompy.visualization.mapview import View2DPacked
+#view2D  = View2DPacked(20,20,"", text_size=7)
+#view2D.show(sm, col_sz=5, what = 'codebook',)#which_dim="all", denormalize=True)
+#plt.show()
+#from sompy.visualization.mapview import View2D
+#view2D  = View2D(20,20,"", text_size=7)
+#view2D.show(sm, col_sz=5, what = 'codebook',)#which_dim="all", denormalize=True)
+#plt.show()
+#from sompy.visualization.bmuhits import BmuHitsView
+#vhts  = BmuHitsView(12,12,"Hits Map",text_size=7)
+#vhts.show(sm, anotate=True, onlyzeros=False, labelsize=10, cmap="autumn", logaritmic=False)
 
 ## Hierarchical Clustering ##
 som_cluster = final_clusters.groupby("Labels").mean()
-som_cluster["h_cluster"] = AgglomerativeClustering(n_clusters=4).fit_predict(som_cluster)
+dend = shc.dendrogram(shc.linkage(som_cluster, method='ward'))
+
+som_cluster["h_cluster"] = AgglomerativeClustering(n_clusters=3).fit_predict(som_cluster)
 # Calculate centroids of clusters and inverse scaling for interpretation
 h_cluster = som_cluster.groupby("h_cluster").mean()
 h_cluster = pd.DataFrame(scaler.inverse_transform(X=h_cluster), columns = customer_related_num)
 # Assign customer to cluster generated by hierarchical clustering
 final_clusters["h_cluster"] = [som_cluster.loc[label,"h_cluster"] for label in final_clusters["Labels"].values]
 # Silhoutte graph
-create_silgraph(df_cust_norm, final_clusters["h_cluster"])
+#create_silgraph(df_cust_norm, final_clusters["somh_cluster"])
 silhouette_avg = silhouette_score(df_cust_norm, final_clusters["h_cluster"])
 print("the average silhouette_score is :", silhouette_avg) 
-
-## K-Means ##
-som_cluster = final_clusters.groupby("Labels").mean()
-
-kmeans = KMeans(n_clusters=4, random_state=1).fit(som_cluster)
-som_cluster["k_cluster"] = kmeans.labels_
-
-k_cluster = som_cluster.groupby("k_cluster").mean()
-k_cluster = pd.DataFrame(scaler.inverse_transform(X=k_cluster), columns = customer_related_num)
-
-final_clusters["k_cluster"] = [som_cluster.loc[i, "k_cluster"] for i in final_clusters["Labels"].values ]
-
-create_silgraph(df_cust_norm, final_clusters["k_cluster"])
-silhouette_avg = silhouette_score(df_cust_norm, final_clusters["k_cluster"])
-print("the average silhouette_score is :", silhouette_avg) 
+df["c_cluster"] = final_clusters["h_cluster"]
 
 #################################################################
 ################## Decision Tree classifier #####################
@@ -265,7 +226,7 @@ df_add["c_cluster"] = pred_cclusters
 df_add["p_cluster"] = pred_pclusters
 
 df = df.append(df_add)
-df = df.reset_index()
+df = df.reset_index(drop=True)
 
 #filling NAN in premiums with zeros (see assumption above)
 df[["premium_motor","premium_household","premium_health","premium_life","premium_work_comp"]] = df[["premium_motor","premium_household","premium_health","premium_life","premium_work_comp"]].fillna(0)
@@ -276,7 +237,7 @@ salary_mean = df.pivot_table(values="salary_year",index="c_cluster",aggfunc="mea
 cat_mode = df[["has_children", "educ", "c_cluster"]].groupby("c_cluster").agg(lambda x: x.mode())
 
 #filling missing data by mean and mode of each cluster
-for i in range(4):
+for i in range(3):
     df["salary_year"][df["c_cluster"]==i]=df["salary_year"][df["c_cluster"]==i].fillna(salary_mean.iloc[i][0])
     df["educ"][df["c_cluster"]==i] = df["educ"][df["c_cluster"]==i].fillna(cat_mode.iloc[i][1])
     df["has_children"][df["c_cluster"]==i]=df["has_children"][df["c_cluster"]==i].fillna(cat_mode.iloc[i][0])
