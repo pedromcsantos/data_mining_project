@@ -74,7 +74,7 @@ df["is_profit"] = [1 if mon_value > 0 else 0 for mon_value in df.mon_value.value
 
 # Split the features in customer- and product-related. 
 customer_related_num = ['salary_year', 'mon_value',  'claims_rate', 'premium_total'] # dont use first_policy because the clusters are clearer without
-customer_related_cat = ['location','has_children', 'educ', 'cancelled_contracts', 'has_all']
+customer_related_cat = ['location','has_children', 'educ', 'cancelled_contracts', 'has_all', "is_profit"]
 customer_related = customer_related_num + customer_related_cat
 product_related = ['premium_motor','premium_household', 'premium_health', 'premium_life','premium_work_comp']
 
@@ -97,9 +97,6 @@ df["p_cluster"] = kmeans.labels_
 create_silgraph(df_prod_norm, df["p_cluster"])
 silhouette_avg = silhouette_score(df_prod_norm, kmeans.labels_)
 print("For n_clusters =", str(2), "the average silhouette_score is :", silhouette_avg) 
-
-# Compute the silhouette scores for each sample
-#create_silgraph(df_prod_norm,kmeans.labels_ )
 
 # Inverse Normalization for Interpretation
 pcluster_centroids_num = pd.DataFrame(scaler.inverse_transform(X=kmeans.cluster_centers_), columns = df_prod_norm.columns)
@@ -132,19 +129,21 @@ final_clusters = pd.concat([final_clusters,my_labels], axis = 1)
 cluster_cols = customer_related_num  + ["Labels"]
 final_clusters.columns = cluster_cols
 
-view2D  = View2DPacked(20,20,"", text_size=7)
-view2D.show(sm, col_sz=5, what = 'codebook',)#which_dim="all", denormalize=True)
+view2D  = View2DPacked(20,20,"", text_size=9)
+view2D.show(sm, col_sz=4, what = 'codebook',)#which_dim="all", denormalize=True)
 plt.show()
 
-view2D  = View2D(20,20,"", text_size=7)
-view2D.show(sm, col_sz=5, what = 'codebook',)#which_dim="all", denormalize=True)
+view2D  = View2D(20,20,"", text_size=9)
+view2D.show(sm, col_sz=2, what = 'codebook',)#which_dim="all", denormalize=True)
 plt.show()
+
 vhts  = BmuHitsView(12,12,"Hits Map",text_size=7)
 vhts.show(sm, anotate=True, onlyzeros=False, labelsize=10, cmap="autumn", logaritmic=False)
 
 ## Hierarchical Clustering ##
 som_cluster = final_clusters.groupby("Labels").mean()
 dend = shc.dendrogram(shc.linkage(som_cluster, method='ward'))
+plt.title("Dendogram with SOM nodes", size=12)
 
 som_cluster["h_cluster"] = AgglomerativeClustering(n_clusters=3).fit_predict(som_cluster)
 # Calculate centroids of clusters and inverse scaling for interpretation
@@ -154,6 +153,7 @@ h_cluster = pd.DataFrame(scaler.inverse_transform(X=h_cluster), columns = custom
 final_clusters["h_cluster"] = [som_cluster.loc[label,"h_cluster"] for label in final_clusters["Labels"].values]
 # Silhoutte graph
 create_silgraph(df_cust_norm, final_clusters["h_cluster"])
+plt.title("Silhouette graph customer clusters", size=12)
 silhouette_avg = silhouette_score(df_cust_norm, final_clusters["h_cluster"])
 print("the average silhouette_score is :", silhouette_avg) 
 df["c_cluster"] = final_clusters["h_cluster"]
@@ -178,7 +178,7 @@ export_graphviz(clf, out_file=dot_data,
                 filled=True,
                 special_characters=True,feature_names = X.columns.values,class_names=['0','1', '3', '4'])
 graph = pydotplus.graph_from_dot_data(dot_data.getvalue())  
-#graph.write_png('decision_tree_cluster.png')
+graph.write_png('decision_tree_cluster.png')
 
 # Predict clusters of outliers and dropped customers
 # c_cluster

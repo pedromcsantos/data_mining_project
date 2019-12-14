@@ -3,21 +3,14 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
 from sklearn.cluster import AgglomerativeClustering
 import scipy.cluster.hierarchy as shc
-from sklearn.metrics import silhouette_score  #avg of avgs
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.model_selection import train_test_split 
-from sklearn import metrics 
-from sklearn.tree import export_graphviz
-from sklearn.externals.six import StringIO  
-import pydotplus
+from sklearn.metrics import silhouette_score
 from helperFunctions import create_silgraph, get_outliers_i, create_elbowgraph
 from sompy.sompy import SOMFactory
 import matplotlib.pyplot as plt
-from sompy.visualization.mapview import View2DPacked
-from sompy.visualization.mapview import View2D
-from sompy.visualization.bmuhits import BmuHitsView
 from kmodes.kprototypes import KPrototypes
 from kmodes.kmodes import KModes
+from sklearn.cluster import DBSCAN
+from sklearn.cluster import MeanShift, estimate_bandwidth
 
 df = pd.read_csv("data/A2Z Insurance.csv")
 # Preprocessing
@@ -79,7 +72,7 @@ df_cust_num_norm = pd.DataFrame(cust_norm, columns = customer_related_num)
 create_elbowgraph(10, df_cust_num_norm)
 kmeans_cust = KMeans(n_clusters=3, random_state=1).fit(df_cust_num_norm)
 df["kmc_cluster"] = kmeans_cust.labels_
-#create_silgraph(df_cust_num_norm,kmeans_cust.labels_ )
+create_silgraph(df_cust_num_norm,kmeans_cust.labels_ )
 silhouette_avg = silhouette_score(df_cust_num_norm, kmeans_cust.labels_)
 cc_kmeans = pd.DataFrame(scaler.inverse_transform(X=kmeans_cust.cluster_centers_), columns = customer_related_num)
 sizes = df["kmc_cluster"].value_counts() / len(df["kmc_cluster"])
@@ -135,6 +128,7 @@ df_cust["k_cluster"] = kmeans_cust_l.predict(df_cust_num_norm)
 cc_cust_num_l = pd.DataFrame(kmeans_cust_l.cluster_centers_, columns = customer_related_num)
 # Create dendogram
 dend = shc.dendrogram(shc.linkage(cc_cust_num_l, method='ward'))
+plt.title("Dendogram")
 # Agglomerative Hierarchical Clustering 
 cc_cust_num_l["h_cluster"] = AgglomerativeClustering(n_clusters=3).fit_predict(cc_cust_num_l)
 # Calculate centroids of clusters and inverse scaling for interpretation
@@ -189,6 +183,36 @@ sizes = df["c_cluster"].value_counts()/ len(df["c_cluster"])
 ap_somhierarch = {"cc": h_cluster, "sil_score": silhouette_avg, "sizes": sizes}
 
 
+#### 5.Approach: DBSCAN 
+scaler = StandardScaler()
+cust_norm = scaler.fit_transform(df[customer_related_num])
+df_cust_num_norm = pd.DataFrame(cust_norm, columns = customer_related_num)
+db = DBSCAN(eps= 0.36,min_samples=15).fit(df_cust_num_norm)
+
+df["labels"] = db.labels_
+cols = customer_related_num + ["labels"]
+cc_dbscan = df[cols].groupby("labels").mean()
+df["labels"].value_counts()
+
+#### 6.Approach: Mean shift
+scaler = StandardScaler()
+cust_norm = scaler.fit_transform(df[customer_related_num])
+df_cust_num_norm = pd.DataFrame(cust_norm, columns = customer_related_num)
+
+my_bandwidth = estimate_bandwidth(df_cust_num_norm,quantile=0.2,n_samples=1000)
+
+ms = MeanShift(bandwidth=my_bandwidth,
+               #bandwidth=0.15,
+               bin_seeding=True)
+
+df["labels"] = db.labels_
+cols = customer_related_num + ["labels"]
+cc_dbscan = df[cols].groupby("labels").mean()
+df["labels"].value_counts()
+ms.fit(df_cust_num_norm)
+labels = ms.labels_
+cluster_centers = ms.cluster_centers_
+
 
 ######## Categorical ###########
 ### 1. Approach: K-Prototype with categorical and numerical Features
@@ -196,25 +220,76 @@ scaler = StandardScaler()
 cust_norm = scaler.fit_transform(df[customer_related_num])
 df_num_norm = pd.DataFrame(cust_norm, columns = customer_related_num)
 df_cust_norm =df_num_norm.join(df[customer_related_cat])
-
 # create_elbowgraph(10, df_cust_norm, "kproto", [4,5,6,7,8] )
-
-kproto = KPrototypes(n_clusters=3, init='random', random_state=1).fit(df_cust_norm, categorical=[4,5,6,7,8])
+kproto = KPrototypes(n_clusters=3, init='random', random_state=1)
+model = kproto.fit(df_cust_norm, categorical=[4,5,6,7,8,9])
 # Inverse Normalization for Interpretation
-cluster_centroids_num_c = pd.DataFrame(scaler.inverse_transform(X = kproto.cluster_centroids_[0]), columns = df_num_norm.columns)
-cluster_centroids_c = pd.concat([cluster_centroids_num_c,pd.DataFrame(kproto.cluster_centroids_[1])], axis=1)
-cluster_centroids_c.columns = df_cust_norm.columns
-
-########################################################################################################################################################################
-########################################################################################################################################################################
+cc_kproto_num = pd.DataFrame(scaler.inverse_transform(X = model.cluster_centroids_[0]))
+cc_kproto = pd.concat([cc_kproto_num,pd.DataFrame(model.cluster_centroids_[1])], axis=1)
+cc_kproto.columns = customer_related
 
 
 
-###### Categorical Kmodes ########
+###### 2. Approach: Categorical Kmodes ########
 kmodes = KModes(n_clusters=4)
 temp_kmodes = kmodes.fit_predict(df[customer_related_cat])
 kmcc = pd.DataFrame(kmodes.cluster_centroids_, columns=customer_related_cat)
 
 df["cat_cluster"] = temp_kmodes
+
+########################################################################################################################################################################
+########################################################################################################################################################################
+############# Products #############
+#### 1. Approach: SOM and Hierarchical Clustering #####################
+scaler = StandardScaler()
+prod_norm = scaler.fit_transform(df[product_related])
+df_prod_norm = pd.DataFrame(prod_norm, columns = product_related)
+X = df_prod_norm.values
+
+sm = SOMFactory().build(data = X,mapsize=(8,8), normalization = 'var', initialization="pca",
+               component_names=product_related,lattice="hexa",training ="batch" )
+sm.train(n_job=5,verbose='info',train_rough_len=40,train_finetune_len=100)
+
+final_clusters = pd.DataFrame(sm._data, columns = product_related)
+my_labels = pd.DataFrame(sm._bmu[0])    
+final_clusters = pd.concat([final_clusters,my_labels], axis = 1)
+cluster_cols = product_related  + ["Labels"]
+final_clusters.columns = cluster_cols
+som_cluster = final_clusters.groupby("Labels").mean()
+dend = shc.dendrogram(shc.linkage(som_cluster, method='ward'))
+plt.title("Dendogram after SOM with product features")
+som_cluster["h_cluster"] = AgglomerativeClustering(n_clusters=2).fit_predict(som_cluster)
+# Calculate centroids of clusters and inverse scaling for interpretation
+h_cluster = som_cluster.groupby("h_cluster").mean()
+h_cluster = pd.DataFrame(scaler.inverse_transform(X=h_cluster), columns = product_related)
+# Assign customer to cluster generated by hierarchical clustering
+final_clusters["h_cluster"] = [som_cluster.loc[label,"h_cluster"] for label in final_clusters["Labels"].values]
+#create_silgraph(df_cust_norm, final_clusters["somh_cluster"])
+silhouette_avg = silhouette_score(df_prod_norm, final_clusters["h_cluster"])
+df["p_cluster"] = final_clusters["h_cluster"]
+
+sizes = df["p_cluster"].value_counts()/ len(df["p_cluster"])
+ap_psomhierarch = {"cc": h_cluster, "sil_score": silhouette_avg, "sizes": sizes}
+
+##### 2. Approach: Kmeans
+scaler = StandardScaler()
+prod_norm = scaler.fit_transform(df[product_related])
+df_prod_norm = pd.DataFrame(prod_norm, columns = product_related)
+create_elbowgraph(10, df_prod_norm)
+
+kmeans = KMeans(n_clusters=2, random_state=1).fit(df_prod_norm)
+df["p_cluster"] = kmeans.labels_
+silhouette_avg = silhouette_score(df_prod_norm, kmeans.labels_)
+cc_pkmeans = pcluster_centroids_num = pd.DataFrame(scaler.inverse_transform(X=kmeans.cluster_centers_), columns = df_prod_norm.columns)
+sizes = df["p_cluster"].value_counts()/ len(df["p_cluster"])
+ap_pkmeans = {"cc": cc_pkmeans, "sil_score": silhouette_avg, "sizes": sizes}
+
+
+
+
+
+
+
+
 
 
