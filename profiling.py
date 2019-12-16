@@ -69,3 +69,53 @@ customer_cluster_prof = df_profiled[customer_related_num].groupby("c_cluster").m
 
 cluster_matrix_prof = pd.crosstab(df_profiled["c_cluster"], df_profiled["p_cluster"])
 
+### Moving clusters around 
+df_profiled["p2_cluster"] = [1 if ((df_profiled.loc[i,"c_cluster"] == 0) | (df_profiled.loc[i,"c_cluster"] == 2))   else  0 for i in df_profiled.index.values]
+df_profiled.p2_cluster.value_counts()
+
+cluster_matrix_prof2 = pd.crosstab(df_profiled["c_cluster"], df_profiled["p2_cluster"])
+
+product_centroids2= df_profiled[['premium_health', 'premium_household','premium_life', 'premium_motor', 'p2_cluster', 'premium_work_comp']].groupby("p2_cluster").mean()
+
+
+#Final decision tree
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.model_selection import train_test_split 
+from sklearn import metrics 
+from sklearn.tree import export_graphviz
+from sklearn.externals.six import StringIO 
+import pydotplus
+import graphviz
+from sklearn import tree
+
+X = df_profiled[['salary_year', 'mon_value', 'claims_rate', 'premium_total']]
+y = df_profiled["c_cluster"]
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=1) 
+
+clf = DecisionTreeClassifier(max_depth=4)
+# Fit model
+clf = clf.fit(X_train,y_train)
+#Predict the cluster for test data
+y_pred = clf.predict(X_test)
+print("Accuracy:",metrics.accuracy_score(y_test, y_pred))
+
+
+dot_data = tree.export_graphviz(clf, out_file=None,
+                                feature_names=X.columns.values,
+                                class_names = ['0','1', '3', '4'] ,
+                                filled=True,
+                                rounded=True,
+                                special_characters=True)  
+graph = graphviz.Source(dot_data)
+
+
+
+
+"""
+dot_data = StringIO()
+export_graphviz(clf, out_file=dot_data,  
+                filled=True,
+                special_characters=True,feature_names = X.columns.values,class_names=['0','1', '3', '4'])
+graph = pydotplus.graph_from_dot_data(dot_data.getvalue())  
+graph.write_png('decision_tree_cluster.png')
+"""
