@@ -35,7 +35,7 @@ df = df[df[["premium_motor","premium_household","premium_health","premium_life",
 ################# Outlier #################
 df.reset_index(inplace=True,drop=True)
 df_num = pd.DataFrame(df[['first_policy', 'salary_year','mon_value','claims_rate','premium_motor','premium_household','premium_health','premium_life','premium_work_comp']])
-# Define individual multipliers for features
+# Define individual thresholds for features
 thresholds = {'salary_year': 200000,'mon_value': -200,'claims_rate': 3,'premium_motor': 600,'premium_household': 1600,'premium_health': 400,'premium_life': 300,'premium_work_comp': 300}
 outliers = []
 for col, th in thresholds.items():
