@@ -17,7 +17,9 @@ customer_related_cat = ['location','has_children', 'educ', 'cancelled_contracts'
 product_related_num = ["premium_motor","premium_household","premium_health","premium_life","premium_work_comp", "p_cluster"]
 
 customer_cluster = df[customer_related_num].groupby("c_cluster").mean()
+df["c_cluster"].value_counts()
 product_cluster = df[product_related_num].groupby("p_cluster").mean()
+df["p_cluster"].value_counts()
 #### Checking if clusters overlap
 ## create a table/Matrix
 cluster_matrix = pd.crosstab(df["p_cluster"], df["c_cluster"])
@@ -39,7 +41,7 @@ for i in df[categoricals]:
     for b in range(len(df[i].unique())):
         trace1 = go.Bar(x= df["c_cluster"].unique().sort(), y = (pd.crosstab(df[i], df["c_cluster"])/pd.crosstab(df[i], df["c_cluster"]).sum()).iloc[b,:], name = b) 
         data.append(trace1)
-    layout = go.Layout(title = i, template = "plotly_dark", xaxis=dict(title="clusters"), yaxis=dict(title="Relative Freq."))
+    layout = go.Layout(title = i, xaxis=dict(title="clusters"), yaxis=dict(title="Relative Freq."))
     fig = go.Figure(data = data, layout = layout)
     fig.update_layout(barmode = "stack")
     fig.write_image("images/profiling/"+i+".png",width=1200, height=500)
@@ -50,7 +52,7 @@ trace2=go.Bar(x= education.index, y = education.iloc[:,1], name = "HS")
 trace3=go.Bar(x= education.index, y = education.iloc[:,2], name = "BSc/MSc")
 trace4=go.Bar(x= education.index, y = education.iloc[:,3], name = "PhD")
 data = [trace1, trace2, trace3, trace4]
-layout = go.Layout(title = "Cluster and educ", template = "plotly_dark", xaxis=dict(title="Cluster"), yaxis=dict(title="Frequency"))
+layout = go.Layout(title = "Cluster and education", xaxis=dict(title="Cluster"), yaxis=dict(title="Frequency"))
 fig = go.Figure(data = data, layout = layout)
 fig.update_layout(barmode = "stack")
 
@@ -69,54 +71,15 @@ customer_cluster_prof = df_profiled[customer_related_num].groupby("c_cluster").m
 
 cluster_matrix_prof = pd.crosstab(df_profiled["c_cluster"], df_profiled["p_cluster"])
 
-### Moving clusters around 
+### Moving clusters around-> in this step, we move all of them around, but we don't keep it as a final solution
 df_profiled["p1_cluster"] = [1 if ((df_profiled.loc[i,"c_cluster"] == 0) | (df_profiled.loc[i,"c_cluster"] == 2))   else  0 for i in df_profiled.index.values]
 df_profiled.p1_cluster.value_counts()
 
-cluster_matrix_prof2 = pd.crosstab(df_profiled["c_cluster"], df_profiled["p_cluster"])
+cluster_matrix_prof2 = pd.crosstab(df_profiled["c_cluster"], df_profiled["p1_cluster"])
 
 product_centroids2= df_profiled[['premium_health', 'premium_household','premium_life', 'premium_motor', 'p1_cluster', 'premium_work_comp']].groupby("p1_cluster").mean()
 
 
-#Final decision tree
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.model_selection import train_test_split 
-from sklearn import metrics 
-from sklearn.tree import export_graphviz
-from sklearn.externals.six import StringIO 
-import pydotplus
-import graphviz
-from sklearn import tree
-
-X = df_profiled[['salary_year', 'mon_value', 'claims_rate', 'premium_total']]
-y = df_profiled["c_cluster"]
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=1) 
-
-clf = DecisionTreeClassifier(max_depth=4)
-# Fit model
-clf = clf.fit(X_train,y_train)
-#Predict the cluster for test data
-y_pred = clf.predict(X_test)
-print("Accuracy:",metrics.accuracy_score(y_test, y_pred))
-
-
-dot_data = tree.export_graphviz(clf, out_file=None,
-                                feature_names=X.columns.values,
-                                class_names = ['0','1', '3', '4'] ,
-                                filled=True,
-                                rounded=True,
-                                special_characters=True)  
-graph = graphviz.Source(dot_data)
-
-
-"""
-dot_data = StringIO()
-export_graphviz(clf, out_file=dot_data,  
-                filled=True,
-                special_characters=True,feature_names = X.columns.values,class_names=['0','1', '3', '4'])
-graph = pydotplus.graph_from_dot_data(dot_data.getvalue())  
-graph.write_png('decision_tree_cluster.png')
-"""
 
 ### Compute probability of each point to belong to the remaining clusters
 
@@ -147,13 +110,18 @@ customer_std_norm = df_profiled_norm[customer_related_num].groupby("c_cluster").
 product_std_norm = df_profiled_norm[product_related_num].groupby("p_cluster").std()
 
 from scipy.stats import norm
+
+#testing for loop
 norm.pdf(x = df_profiled_norm.loc[10251,"salary_year"],loc = customer_cluster_norm.iloc[0][0], scale = customer_std_norm.iloc[0][0])
 norm.pdf(x = df_profiled_norm.loc[10251,"salary_year"],loc = customer_cluster_norm.iloc[1][0], scale = customer_std_norm.iloc[1][0])
 norm.pdf(x = df_profiled_norm.loc[10251,"salary_year"],loc = customer_cluster_norm.iloc[2][0], scale = customer_std_norm.iloc[2][0])
 norm.pdf(x = df_profiled_norm.loc[10251,"salary_year"],loc = customer_cluster_norm.iloc[3][0], scale = customer_std_norm.iloc[3][0])
 
+
+#Creating df for customers we are moving around based on probability
 df_profiled_p_mov = df_profiled[((df_profiled["c_cluster"]==0)&(df_profiled["p_cluster"]==0))|((df_profiled["c_cluster"]==1)&(df_profiled["p_cluster"]==1))]
 
+#Computing mean and std
 cc_01 = customer_cluster_norm.iloc[0].append(product_cluster_norm.iloc[1])
 cc_10 = customer_cluster_norm.iloc[1].append(product_cluster_norm.iloc[0])
 cc_21 = customer_cluster_norm.iloc[2].append(product_cluster_norm.iloc[1])
@@ -194,9 +162,57 @@ for i in df_profiled_p_mov.index:
 df_profiled_p_mov.new_cluster.value_counts()
 cross_test = pd.crosstab(df_profiled_p_mov["new_cluster"], df_profiled_p_mov["p_cluster"])
 
-df_profiled["c2_cluster"] = [ccpc[int(df_profiled_p_mov.loc[c, "new_cluster"])][0]  if c in df_profiled_p_mov.index.values else df_profiled.loc[c,"c_cluster"] for c in df_profiled.index.values]
+df_profiled["c2_cluster"] = [ccpc[int(df_profiled_p_mov.loc[10252, "new_cluster"])][0]  if c in df_profiled_p_mov.index.values else df_profiled.loc[c,"c_cluster"] for c in df_profiled.index.values]
 df_profiled["p2_cluster"] = [ccpc[int(df_profiled_p_mov.loc[c, "new_cluster"])][1]  if c in df_profiled_p_mov.index.values else df_profiled.loc[c,"p1_cluster"] for c in df_profiled.index.values]
 
 cluster_matrix_prof_final = pd.crosstab(df_profiled["c2_cluster"], df_profiled["p2_cluster"])
 
-#CHANGE TREE TO HERE 
+
+#Final decision tree
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.model_selection import train_test_split 
+from sklearn import metrics 
+from sklearn.tree import export_graphviz
+from sklearn.externals.six import StringIO 
+import pydotplus
+import graphviz
+from sklearn import tree
+
+X = df_profiled[['salary_year', 'mon_value', 'claims_rate', 'premium_total',"premium_motor","premium_household","premium_health","premium_life","premium_work_comp","is_profit"]]
+y = df_profiled["c2_cluster"]
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=1) 
+
+clf = DecisionTreeClassifier(max_depth=4)
+# Fit model
+clf = clf.fit(X_train,y_train)
+#Predict the cluster for test data
+y_pred = clf.predict(X_test)
+print("Accuracy:",metrics.accuracy_score(y_test, y_pred))
+
+
+dot_data = tree.export_graphviz(clf, out_file=None,
+                                feature_names=X.columns.values,
+                                class_names = ['0','1', '3', '4'] ,
+                                filled=True,
+                                rounded=True,
+                                special_characters=True)  
+graph = graphviz.Source(dot_data)
+
+dot_data = StringIO()
+export_graphviz(clf, out_file=dot_data,  
+                filled=True,
+                special_characters=True,feature_names = X.columns.values,class_names=['0','1', '3', '4'])
+graph = pydotplus.graph_from_dot_data(dot_data.getvalue())  
+graph.write_png('decision_tree_cluster_final.png')
+
+
+#For reference only
+for i in df[categoricals]:
+    data = []
+    for b in range(len(df[i].unique())):
+        trace1 = go.Bar(x= df_profiled["c2_cluster"].unique().sort(), y = (pd.crosstab(df[i], df_profiled["c2_cluster"])/pd.crosstab(df[i], df_profiled["c2_cluster"]).sum()).iloc[b,:], name = b) 
+        data.append(trace1)
+    layout = go.Layout(title = i, xaxis=dict(title="clusters"), yaxis=dict(title="Relative Freq."))
+    fig = go.Figure(data = data, layout = layout)
+    fig.update_layout(barmode = "stack")
+    fig.write_image("images/profiling/final/"+i+"2"+".png",width=1200, height=500)
