@@ -203,7 +203,48 @@ export_graphviz(clf, out_file=dot_data,
                 filled=True,
                 special_characters=True,feature_names = X.columns.values,class_names=['0','1', '3', '4'])
 graph = pydotplus.graph_from_dot_data(dot_data.getvalue())  
-graph.write_png('decision_tree_cluster_final.png')
+graph.write_png('images/decision_tree_cluster_final.png')
+
+# Leverage of clusters
+sum_mon_val = df[["mon_value", "c_cluster"]].groupby("c_cluster").sum()
+prop_mon_val = sum_mon_val["mon_value"].apply(lambda x: x/sum(sum_mon_val["mon_value"]))
+count_cust = df["c_cluster"].value_counts().sort_index()
+prop_cust= count_cust.apply(lambda x: x/sum(count_cust.values))
+
+mon_labels = [str(round(p*100,2)) + "%" for p in prop_mon_val.values]
+cus_labels = [str(round(p*100,2)) + "%" for p in prop_cust.values]
+leverage = prop_mon_val / prop_cust
+
+data = [go.Bar(name="Monetary value", x=prop_mon_val.index, y=prop_mon_val, text=mon_labels,textposition="auto"),
+		go.Bar(name="Proporation of customers", x=prop_mon_val.index, y=prop_cust, text=cus_labels,textposition="auto")]
+
+
+layout = go.Layout(title=dict(text="Leverage", y=0.9, x=0.5, xanchor="center", yanchor="top", font=dict(size=30)),
+				   xaxis=dict(tickmode = 'array', tickvals=[k for k in range(0, len(prop_cust.index.values))],
+						ticktext = ["Cluster " + str(c + 1) for c in prop_cust.index.values],
+						tickfont = dict(size=20)), template="plotly_white")
+
+fig = go.Figure(data=data, layout=layout)
+for i in range(0,4):
+	fig.add_annotation(
+	    go.layout.Annotation(
+	            x=i,
+	            y=0.7,
+	            text=round(leverage[i],2), 
+				font=dict(size=16),
+		        align="center",bordercolor="#c7c7c7",
+		        borderwidth=2,
+		        borderpad=4, 
+				showarrow=False))
+
+fig.write_image("leverage.png", width=1000, height=500)
+
+
+
+
+
+
+
 
 
 #For reference only
