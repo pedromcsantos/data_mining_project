@@ -221,7 +221,7 @@ data = [go.Bar(name="Proporation of Total Monetary value", x=prop_mon_val.index,
 
 layout = go.Layout(title=dict(text="Leverage", y=0.9, x=0.5, xanchor="center", yanchor="top", font=dict(size=30)),
 				   xaxis=dict(tickmode = 'array', tickvals=[k for k in range(0, len(prop_cust.index.values))],
-						ticktext = ["Cluster " + str(c + 1) for c in prop_cust.index.values],
+						ticktext = ["Cluster " + str(c ) for c in prop_cust.index.values],
 						tickfont = dict(size=20)), template="plotly_white")
 
 fig = go.Figure(data=data, layout=layout)
@@ -240,10 +240,11 @@ for i in range(0,3):
 fig.write_image("leverage.png", width=1000, height=500)
 
 
-#final_centroids = df_profiled[numericals + ['c2_cluster', 'p2_cluster', 'is_profit']].groupby(['c2_cluster','p2_cluster']).mean()
+final_centroids = df_profiled[numericals + ['c2_cluster', 'p2_cluster', 'is_profit']].groupby(['c2_cluster','p2_cluster']).mean()
+final_centroids_frq = df_profiled[numericals + ['c2_cluster', 'p2_cluster', 'is_profit']].groupby(['c2_cluster','p2_cluster']).count()
 
-final_ccentroids = df_profiled[['salary_year',  'mon_value', 'claims_rate', 'premium_total', "c2_cluster"]].groupby('c2_cluster').mean()
-final_pcentroids = df_profiled[['premium_health', 'premium_household','premium_life', 'premium_motor', 'p2_cluster', 'premium_work_comp']].groupby('p2_cluster').mean()
+#final_ccentroids = df_profiled[['salary_year',  'mon_value', 'claims_rate', 'premium_total', "c2_cluster"]].groupby('c2_cluster').mean()
+#final_pcentroids = df_profiled[['premium_health', 'premium_household','premium_life', 'premium_motor', 'p2_cluster', 'premium_work_comp']].groupby('p2_cluster').mean()
 
 
 
