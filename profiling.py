@@ -229,7 +229,7 @@ for i in range(0,4):
 	fig.add_annotation(
 	    go.layout.Annotation(
 	            x=i,
-	            y=0.7,
+	            y=0.9,
 	            text=round(leverage[i],2), 
 				font=dict(size=16),
 		        align="center",bordercolor="#c7c7c7",
