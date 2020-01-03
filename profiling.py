@@ -162,7 +162,7 @@ for i in df_profiled_p_mov.index:
 df_profiled_p_mov.new_cluster.value_counts()
 cross_test = pd.crosstab(df_profiled_p_mov["new_cluster"], df_profiled_p_mov["p_cluster"])
 
-df_profiled["c2_cluster"] = [ccpc[int(df_profiled_p_mov.loc[10252, "new_cluster"])][0]  if c in df_profiled_p_mov.index.values else df_profiled.loc[c,"c_cluster"] for c in df_profiled.index.values]
+df_profiled["c2_cluster"] = [ccpc[int(df_profiled_p_mov.loc[c, "new_cluster"])][0]  if c in df_profiled_p_mov.index.values else df_profiled.loc[c,"c_cluster"] for c in df_profiled.index.values]
 df_profiled["p2_cluster"] = [ccpc[int(df_profiled_p_mov.loc[c, "new_cluster"])][1]  if c in df_profiled_p_mov.index.values else df_profiled.loc[c,"p1_cluster"] for c in df_profiled.index.values]
 
 cluster_matrix_prof_final = pd.crosstab(df_profiled["c2_cluster"], df_profiled["p2_cluster"])
@@ -206,9 +206,9 @@ graph = pydotplus.graph_from_dot_data(dot_data.getvalue())
 graph.write_png('images/decision_tree_cluster_final.png')
 
 # Leverage of clusters
-sum_mon_val = df[["mon_value", "c_cluster"]].groupby("c_cluster").sum()
+sum_mon_val = df_profiled[["mon_value", "c2_cluster"]].groupby("c2_cluster").sum()
 prop_mon_val = sum_mon_val["mon_value"].apply(lambda x: x/sum(sum_mon_val["mon_value"]))
-count_cust = df["c_cluster"].value_counts().sort_index()
+count_cust = df_profiled["c2_cluster"].value_counts().sort_index()
 prop_cust= count_cust.apply(lambda x: x/sum(count_cust.values))
 
 mon_labels = [str(round(p*100,2)) + "%" for p in prop_mon_val.values]
@@ -240,9 +240,10 @@ for i in range(0,4):
 fig.write_image("leverage.png", width=1000, height=500)
 
 
+#final_centroids = df_profiled[numericals + ['c2_cluster', 'p2_cluster', 'is_profit']].groupby(['c2_cluster','p2_cluster']).mean()
 
-
-
+final_ccentroids = df_profiled[['salary_year',  'mon_value', 'claims_rate', 'premium_total', "c2_cluster"]].groupby('c2_cluster').mean()
+final_pcentroids = df_profiled[['premium_health', 'premium_household','premium_life', 'premium_motor', 'p2_cluster', 'premium_work_comp']].groupby('p2_cluster').mean()
 
 
 
