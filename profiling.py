@@ -182,7 +182,7 @@ X = df_profiled[['salary_year', 'mon_value', 'claims_rate', 'premium_total',"pre
 y = df_profiled["c2_cluster"]
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=1) 
 
-clf = DecisionTreeClassifier(max_depth=4)
+clf = DecisionTreeClassifier(max_depth=5)
 # Fit model
 clf = clf.fit(X_train,y_train)
 #Predict the cluster for test data
@@ -192,7 +192,7 @@ print("Accuracy:",metrics.accuracy_score(y_test, y_pred))
 
 dot_data = tree.export_graphviz(clf, out_file=None,
                                 feature_names=X.columns.values,
-                                class_names = ['0','1', '3', '4'] ,
+                                class_names = ['0','1', '2', '3'] ,
                                 filled=True,
                                 rounded=True,
                                 special_characters=True)  
@@ -201,7 +201,7 @@ graph = graphviz.Source(dot_data)
 dot_data = StringIO()
 export_graphviz(clf, out_file=dot_data,  
                 filled=True,
-                special_characters=True,feature_names = X.columns.values,class_names=['0','1', '3', '4'])
+                special_characters=True,feature_names = X.columns.values,class_names=['0','1', '2', '3'])
 graph = pydotplus.graph_from_dot_data(dot_data.getvalue())  
 graph.write_png('decision_tree_cluster_final.png')
 
