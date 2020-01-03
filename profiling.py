@@ -206,17 +206,17 @@ graph = pydotplus.graph_from_dot_data(dot_data.getvalue())
 graph.write_png('images/decision_tree_cluster_final.png')
 
 # Leverage of clusters
-sum_mon_val = df_profiled[["mon_value", "c2_cluster"]].groupby("c2_cluster").sum()
+sum_mon_val = df_profiled[df_profiled["c2_cluster"] != 3][["mon_value", "c2_cluster"]].groupby("c2_cluster").sum()
 prop_mon_val = sum_mon_val["mon_value"].apply(lambda x: x/sum(sum_mon_val["mon_value"]))
-count_cust = df_profiled["c2_cluster"].value_counts().sort_index()
+count_cust = df_profiled[df_profiled["c2_cluster"] != 3]["c2_cluster"].value_counts().sort_index()
 prop_cust= count_cust.apply(lambda x: x/sum(count_cust.values))
 
 mon_labels = [str(round(p*100,2)) + "%" for p in prop_mon_val.values]
 cus_labels = [str(round(p*100,2)) + "%" for p in prop_cust.values]
 leverage = prop_mon_val / prop_cust
 
-data = [go.Bar(name="Monetary value", x=prop_mon_val.index, y=prop_mon_val, text=mon_labels,textposition="auto"),
-		go.Bar(name="Proporation of customers", x=prop_mon_val.index, y=prop_cust, text=cus_labels,textposition="auto")]
+data = [go.Bar(name="Proporation of Total Monetary value", x=prop_mon_val.index, y=prop_mon_val, text=mon_labels,textposition="auto"),
+		go.Bar(name="Proporation of Total customers", x=prop_mon_val.index, y=prop_cust, text=cus_labels,textposition="auto")]
 
 
 layout = go.Layout(title=dict(text="Leverage", y=0.9, x=0.5, xanchor="center", yanchor="top", font=dict(size=30)),
@@ -225,11 +225,11 @@ layout = go.Layout(title=dict(text="Leverage", y=0.9, x=0.5, xanchor="center", y
 						tickfont = dict(size=20)), template="plotly_white")
 
 fig = go.Figure(data=data, layout=layout)
-for i in range(0,4):
+for i in range(0,3):
 	fig.add_annotation(
 	    go.layout.Annotation(
 	            x=i,
-	            y=0.9,
+	            y=0.7,
 	            text=round(leverage[i],2), 
 				font=dict(size=16),
 		        align="center",bordercolor="#c7c7c7",
